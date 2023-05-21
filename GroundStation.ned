@@ -16,7 +16,7 @@ module GroundStation extends AdhocHost
   		int nodeType = 171;
   		
   		
-  		@class(MobileNode);
+  		@class(GroundStation);
   	
   	submodules:
   	    protocol: <default("CommunicationProtocolBase")> like IProtocol {

@@ -1,12 +1,12 @@
 #
-# OMNeT++/OMNEST Makefile for gradys-simulations
+# OMNeT++/OMNEST Makefile for projeto
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep -O out -KINET_PROJ=../inet -DINET_IMPORT -I. -I$$\(INET_PROJ\)/src -L$$\(INET_PROJ\)/src -lINET$$\(D\)
+#  opp_makemake -f --deep -O out -KINET_PROJ=C:/Users/marce/omnetpp-5.6.2/samples/inet -DINET_IMPORT -I. -I$$\(INET_PROJ\)/src -L$$\(INET_PROJ\)/src -lINET$$\(D\)
 #
 
 # Name of target to be created (-o option)
-TARGET = gradys-simulations$(D)$(EXE_SUFFIX)
+TARGET = projeto$(D)$(EXE_SUFFIX)
 TARGET_DIR = .
 
 # User interface (uncomment one) (-u option)
@@ -31,6 +31,7 @@ O = $(PROJECT_OUTPUT_DIR)/$(CONFIGNAME)/$(PROJECTRELATIVE_PATH)
 
 # Object files for local .cc, .msg and .sm files
 OBJS = \
+    $O/GroundStation.o \
     $O/MobileNode.o \
     $O/MobileSensorNode.o \
     $O/antenna/DipoleAntennaCustom.o \
@@ -51,6 +52,15 @@ OBJS = \
     $O/communication/protocols/sensor/DadcaProtocolSensor.o \
     $O/communication/protocols/sensor/SimpleSensorProtocol.o \
     $O/communication/protocols/sensor/ZigzagProtocolSensor.o \
+    $O/cvrp/AlgorithmParameters.o \
+    $O/cvrp/C_Interface.o \
+    $O/cvrp/Genetic.o \
+    $O/cvrp/Individual.o \
+    $O/cvrp/InstanceCVRPLIB.o \
+    $O/cvrp/LocalSearch.o \
+    $O/cvrp/Params.o \
+    $O/cvrp/Population.o \
+    $O/cvrp/Split.o \
     $O/linklayer/blemesh/BleMeshMac.o \
     $O/linklayer/blemesh/BleMeshProtocolDissector.o \
     $O/linklayer/blemesh/InterfaceEntryExt.o \
@@ -85,7 +95,7 @@ MSGFILES = \
 SMFILES =
 
 # Other makefile variables (-K)
-INET_PROJ=../inet
+INET_PROJ=C:/Users/marce/omnetpp-5.6.2/samples/inet
 
 #------------------------------------------------------------------------------
 

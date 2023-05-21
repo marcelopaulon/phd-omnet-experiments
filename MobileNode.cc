@@ -11,8 +11,6 @@ Register_Class(MobileNode);
 
 void MobileNode::initialize(){
 
-
-
     // TO-DO: these ID shaw be UUID as in network
     internalMobNodeId = this->getId() -  par("simulationIndexOfFirstNode").intValue() + 1;
     par("internalMobNodeId").setIntValue(internalMobNodeId);
