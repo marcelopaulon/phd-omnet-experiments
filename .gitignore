@@ -1,6 +1,6 @@
 instanceTemp.vrp
 instanceTemp.vrp-result
-
+paths/temp*.waypoints
 # Result files
 *.sca
 *.vci

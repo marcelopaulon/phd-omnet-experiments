@@ -31,6 +31,10 @@ void DroneMobility::initialize(int stage) {
 }
 
 void DroneMobility::setInitialPosition() {
+    if (waypoints.size() == 0) {
+        return;
+    }
+
     double x = homeLatitude,y = homeLongitude, z = waypoints[targetPointIndex].timestamp;
 
     auto coordinateSystem = getModuleFromPar<IGeographicCoordinateSystem>(par("coordinateSystemModule"), this, false);
@@ -402,6 +406,10 @@ void DroneMobility::orient() {
             lastOrientation = Quaternion(angles);
         }
     } else {
+        if (waypoints.size() <= targetPointIndex) {
+            return;
+        }
+
         Coord target = Coord(waypoints[targetPointIndex].x, waypoints[targetPointIndex].y, 0);
 
         Coord currentLocation = lastPosition;
@@ -671,9 +679,14 @@ void DroneMobility::executeCommand() {
 // Sends telemetry to the communications module
 // If sendTour is true attaches tour to the message
 void DroneMobility::sendTelemetry(bool sendTour) {
+    if (instructions.size() == 0) {
+        return;
+    }
+
     Enter_Method_Silent("sendTelemetry(%d)", 0);
     Telemetry *message = new Telemetry("Telemetry", 0);
     message->setIsReversed(droneStatus.isReversed);
+
     message->setNextWaypointID(instructions[currentInstructionIndex].waypointIndex);
     if(droneStatus.lastInstructionIndex >= 0 && droneStatus.lastInstructionIndex < instructions.size()) {
         message->setLastWaypointID(instructions[droneStatus.lastInstructionIndex].waypointIndex);

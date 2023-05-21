@@ -12,6 +12,7 @@
 #include <inet/mobility/static/StationaryMobility.h>
 #include <inet/mobility/contract/IMobility.h>
 #include <inet/mobility/base/MobilityBase.h>
+#include "inet/common/geometry/common/GeographicCoordinateSystem.h"
 
 #include <iostream>
 #include <fstream>
@@ -138,10 +139,16 @@ void GroundStation::handleMessage(cMessage *msg) {
 void GroundStation::doPostInitializationTasks() {
     try
     {
+
         cModule *topModule = getModuleByPath("<root>");  // Get the top-level module
 
         MyVisitor visitor;
         topModule->forEachChild(&visitor);
+
+        cObject *mobilityObj = this->findObject("mobility");
+        StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
+
+        auto coordinateSystem = getModuleFromPar<IGeographicCoordinateSystem>(mobility->par("coordinateSystemModule"), mobility, false);
 
         std::string tempFileName = "instanceTemp.vrp";
         visitor.saveTempFile(tempFileName);
@@ -150,7 +157,9 @@ void GroundStation::doPostInitializationTasks() {
         int nbVeh = visitor.numDrones;
         bool verbose = true;
         AlgorithmParameters ap = default_algorithm_parameters();
-        Params params(cvrp.x_coords,cvrp.y_coords,cvrp.dist_mtx,cvrp.service_time,cvrp.demands,
+        xRouteCoords = cvrp.x_coords;
+        yRouteCoords = cvrp.y_coords;
+        Params params(xRouteCoords,yRouteCoords,cvrp.dist_mtx,cvrp.service_time,cvrp.demands,
                       cvrp.vehicleCapacity,cvrp.durationLimit,nbVeh,cvrp.isDurationConstraint,verbose,ap);
 
         // Running HGS
@@ -167,13 +176,56 @@ void GroundStation::doPostInitializationTasks() {
             routes.clear();
             for (int k = 0; k < (int)indiv.chromR.size(); k++)
             {
+                std::string outputFileName = "paths/tempAutoRouteUav" + std::to_string(k) + ".waypoints";
+                std::ofstream outputFile(outputFileName); // Open the file for writing
+
                 if (!indiv.chromR[k].empty())
                 {
                     std::vector<int> route;
                     for (int i : indiv.chromR[k]) route.push_back(i);
+
+                    if (outputFile.is_open()) {
+                        outputFile << "QGC WPL 110" << std::endl;
+                        double gsx = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).latitude.get();
+                        double gsy = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).longitude.get();
+                        outputFile << "0\t0\t0\t16\t0\t0\t0\t0\t" << gsx  << "\t" << gsy << "\t0\t1" << std::endl;
+                        outputFile << "1\t0\t0\t22\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // TAKE-OFF
+                        outputFile << "2\t0\t0\t16\t0\t0\t0\t0\t" << gsx  << "\t" << gsy << "\t20\t1" << std::endl;
+                        int nextQGC = 3;
+                        for (int i : route) {
+                            double scx = xRouteCoords[i];
+                            double scy = yRouteCoords[i];
+                            auto geoCoord = coordinateSystem->computeGeographicCoordinate(Coord(scx, scy, 0.0));
+                            double cx = geoCoord.latitude.get();
+                            double cy = geoCoord.longitude.get();
+
+                            outputFile << nextQGC << "\t0\t0\t16\t0\t0\t0\t0\t" << cx  << "\t" << cy << "\t20\t1" << std::endl;
+                            nextQGC++;
+                        }
+
+                        outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
+
+                        outputFile.close(); // Close the file
+                        std::cout << "Data written to the file successfully." << std::endl;
+                    } else {
+                        std::cerr << "Error opening the file." << std::endl;
+                    }
+
                     routes.push_back(route);
+                } else {
+                    if (outputFile.is_open()) {
+                        outputFile << "QGC WPL 110" << std::endl;
+                        double gsx = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).latitude.get();
+                        double gsy = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).longitude.get();
+                        outputFile << "0\t0\t0\t16\t0\t0\t0\t0\t" << gsx  << "\t" << gsy << "\t0\t1" << std::endl;
+                        outputFile.close(); // Close the file
+                        std::cout << "Data written to the file successfully." << std::endl;
+                    } else {
+                        std::cerr << "Error opening the file." << std::endl;
+                    }
                 }
             }
+
             routeCost = indiv.eval.penalizedCost;
         }
     }

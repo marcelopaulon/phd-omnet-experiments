@@ -14,7 +14,7 @@ module GroundStation extends AdhocHost
   		int internalMobNodeId = -1;
   		int simulationIndexOfFirstNode = 6;
   		int nodeType = 171;
-  		
+  		string coordinateSystemModule = default(""); // module path of the geographic coordinate system module
   		
   		@class(GroundStation);
   	
