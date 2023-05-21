@@ -203,7 +203,7 @@ void GroundStation::doPostInitializationTasks() {
                             nextQGC++;
                         }
 
-                        outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
+                        //outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
 
                         outputFile.close(); // Close the file
                         std::cout << "Data written to the file successfully." << std::endl;

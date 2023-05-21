@@ -508,6 +508,9 @@ void DroneMobility::nextInstruction() {
         }
     } else {
         currentInstructionIndex++;
+        if (currentInstructionIndex >= waypoints.size()) { // TODO: add repeat bool parameter?
+            currentInstructionIndex = 0;
+        }
     }
 
 
