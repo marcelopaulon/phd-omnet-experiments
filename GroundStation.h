@@ -31,6 +31,8 @@ namespace projeto {
 
 class GroundStation : public cSimpleModule  {
   private:
+    std::vector<std::vector<int>> routes;
+    double routeCost = 0.0;
     void doPostInitializationTasks();
   protected:
     virtual void initialize() override;

@@ -25,7 +25,9 @@ class MyVisitor : public cVisitor {
 public:
     std::vector<double> x_coords;
     std::vector<double> y_coords;
-    int numDrones;
+    int numDrones = 0;
+
+    Coord groundStationPosition;
 
     void visit(cObject *obj) override {
         EV << "Object name: " << obj->getFullName() << endl;
@@ -46,6 +48,11 @@ public:
         } else if (strcmp(obj->getName(), "quads") == 0) {
             numDrones++;
             EV << "Drone loaded" << endl;
+        } else if (strcmp(obj->getName(), "groundStation") == 0) {
+            cModule *module = check_and_cast<cModule*>(obj);
+            cObject *mobilityObj = module->findObject("mobility");
+            StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
+            groundStationPosition = mobility->getCurrentPosition();
         }
     }
 
@@ -57,17 +64,20 @@ public:
             outputFile << "COMMENT : 524.61" << std::endl;
             outputFile << "TYPE : CVRP" << std::endl;
             int nSensors = x_coords.size();
-            outputFile << "DIMENSION : " << nSensors << std::endl;
+            outputFile << "DIMENSION : " << (nSensors + 1) << std::endl; // dimension = nSensors + nGroundStations
             outputFile << "EDGE_WEIGHT_TYPE : EUC_2D" << std::endl;
-            int capacity = nSensors;
+            int capacity = nSensors + 1; // add 1 for the ground station
             outputFile << "CAPACITY : " << capacity << std::endl;
             outputFile << "NODE_COORD_SECTION" << std::endl;
+
+            outputFile << "1 " << groundStationPosition.x << " " << groundStationPosition.y << std::endl;
             for (int i = 0; i < nSensors; i++) {
-                outputFile << (i + 1) << " " << x_coords[i] << " " << y_coords[i] << std::endl;
+                outputFile << (i + 2) << " " << x_coords[i] << " " << y_coords[i] << std::endl;
             }
             outputFile << "DEMAND_SECTION" << std::endl;
+            outputFile << "1 0" << std::endl; // Ground station has demand=0
             for (int i = 0; i < nSensors; i++) {
-                outputFile << (i + 1) << " 1" << std::endl;
+                outputFile << (i + 2) << " 1" << std::endl;
             }
             outputFile << "DEPOT_SECTION" << std::endl;
             outputFile << "1" << std::endl;
@@ -139,7 +149,7 @@ void GroundStation::doPostInitializationTasks() {
         InstanceCVRPLIB cvrp(tempFileName, true);
         int nbVeh = visitor.numDrones;
         bool verbose = true;
-        AlgorithmParameters ap;
+        AlgorithmParameters ap = default_algorithm_parameters();
         Params params(cvrp.x_coords,cvrp.y_coords,cvrp.dist_mtx,cvrp.service_time,cvrp.demands,
                       cvrp.vehicleCapacity,cvrp.durationLimit,nbVeh,cvrp.isDurationConstraint,verbose,ap);
 
@@ -150,14 +160,25 @@ void GroundStation::doPostInitializationTasks() {
         // Exporting the best solution
         if (solver.population.getBestFound() != NULL)
         {
-            //if (params.verbose) std::cout << "----- WRITING BEST SOLUTION IN : " << commandline.pathSolution << std::endl;
-            //solver.population.exportCVRPLibFormat(*solver.population.getBestFound(),commandline.pathSolution);
-            //solver.population.exportSearchProgress(commandline.pathSolution + ".PG.csv", commandline.pathInstance);
+            auto indiv = *solver.population.getBestFound();
+
+            solver.population.exportCVRPLibFormat(indiv, tempFileName + "-result");
+
+            routes.clear();
+            for (int k = 0; k < (int)indiv.chromR.size(); k++)
+            {
+                if (!indiv.chromR[k].empty())
+                {
+                    std::vector<int> route;
+                    for (int i : indiv.chromR[k]) route.push_back(i);
+                    routes.push_back(route);
+                }
+            }
+            routeCost = indiv.eval.penalizedCost;
         }
     }
     catch (const string& e) { std::cout << "EXCEPTION | " << e << std::endl; }
     catch (const std::exception& e) { std::cout << "EXCEPTION | " << e.what() << std::endl; }
-
 }
 
 } //namespace
