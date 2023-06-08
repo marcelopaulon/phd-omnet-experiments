@@ -77,8 +77,9 @@ public:
             }
             outputFile << "DEMAND_SECTION" << std::endl;
             outputFile << "1 0" << std::endl; // Ground station has demand=0
+            int nUAVS = 2;
             for (int i = 0; i < nSensors; i++) {
-                outputFile << (i + 2) << " 1" << std::endl;
+                outputFile << (i + 2) << " " << nUAVS  << std::endl;
             }
             outputFile << "DEPOT_SECTION" << std::endl;
             outputFile << "1" << std::endl;

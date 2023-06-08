@@ -14,6 +14,8 @@ simple DroneMobility extends VehicleMobility
         double homeLatitude @unit(degree);
         double homeLongitude @unit(degree);
         
+        bool continuousRoute=default(false);
+        
 	gates:
 	    inout protocolGate[];
 }

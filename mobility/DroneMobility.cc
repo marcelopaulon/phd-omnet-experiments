@@ -508,7 +508,7 @@ void DroneMobility::nextInstruction() {
         }
     } else {
         currentInstructionIndex++;
-        if (currentInstructionIndex >= waypoints.size()) { // TODO: add repeat bool parameter?
+        if (par("continuousRoute") && currentInstructionIndex >= waypoints.size()) {
             currentInstructionIndex = 0;
         }
     }
