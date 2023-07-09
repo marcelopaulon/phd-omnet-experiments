@@ -141,7 +141,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    std::cout << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
                         // If both drones are travelling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
@@ -150,31 +150,8 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
                                 currentDataLoad = currentDataLoad + payload->getDataLength();
-
-
-                                // Doesn't update neighbours if the drone has no waypoints
-                                // This prevents counting the groundStation as a drone
-                                if(!destinationIsGroundstation) {
-                                    // Drone closest to the start updates right neighbours
-                                    rightNeighbours = payload->getRightNeighbours() + 1;
-                                }
-                            } else {
-                                // Drone farthest away loses data
-                                currentDataLoad = 0;
-
-                                // Doesn't update neighbours if the drone has no waypoints
-                                // This prevents counting the groundStation as a drone
-                                if(!destinationIsGroundstation) {
-                                    // Drone farthest away updates left neighbours
-                                    leftNeighbours = payload->getLeftNeighbours() + 1;
-                                }
                             }
 
-                            // Only completes redevouz if tour has been recieved or the paired drone has no waypoints
-                            // This prevents rendevouz with the groundStation
-                            if(tour.size() > 0 && !destinationIsGroundstation) {
-                                rendevouz();
-                            }
                             // Updating data load
                             emit(dataLoadSignalID, currentDataLoad);
                             communicationStatus = PAIRED_FINISHED;
@@ -182,7 +159,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                         }
                     }
                }
-                break;
+               break;
             }
             case DadcaAckMessageType::BEARER:
             {
@@ -216,109 +193,6 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
             stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
-    }
-}
-
-void DadcaAckGroundStationProtocol::rendevouz() {
-    // Drone is the left or right one in the pair
-    bool isLeft = !lastStableTelemetry.isReversed();
-
-    // Calculates rally point
-    std::vector<double> cumulativeDistances;
-    double totalDistance = 0;
-    Coord lastCoord;
-    for(int i = 0; i < tour.size(); i++) {
-        Coord coord = tour[i];
-
-        if(i > 0) {
-            totalDistance += lastCoord.distance(coord);
-        }
-        cumulativeDistances.push_back(totalDistance);
-
-        lastCoord = coord;
-    }
-    int totalNeighbours = leftNeighbours + rightNeighbours;
-
-    // Shared border where the paired drones will meet
-    double sharedBorder = (double) leftNeighbours / (totalNeighbours + 1);
-    // If the drone is not inverted it will start it's trip from the end
-    // of it's segment and them invert
-    if(isLeft) {
-        sharedBorder += 1.0/(totalNeighbours + 1);
-    }
-    double sharedBorderDistance = totalDistance * sharedBorder;
-
-    // Determines the waypoint index closest to the shared border
-    int waypointIndex;
-    for(waypointIndex=0; waypointIndex < cumulativeDistances.size() ; waypointIndex++) {
-        if(cumulativeDistances[waypointIndex] > sharedBorderDistance) {
-            // Waypoint before the acumulated distance is higher than the
-            // shared border distance
-            waypointIndex--;
-            break;
-        }
-    }
-
-    // Fraction that devides the waypoint before the shared border and the one after it
-    // at the shared border
-    double localBorderFraction = 1 - (cumulativeDistances[waypointIndex + 1] - sharedBorderDistance) / (cumulativeDistances[waypointIndex + 1] - cumulativeDistances[waypointIndex]);
-
-    Coord coordsBefore = tour[waypointIndex];
-    Coord coordsAfter = tour[waypointIndex + 1];
-    Coord sharedBorderCoords = ((coordsAfter - coordsBefore) * localBorderFraction) + coordsBefore;
-
-    bool isAhead = false;
-
-    if(!isLeft) {
-        if(lastStableTelemetry.getNextWaypointID() > waypointIndex) {
-            isAhead = true;
-        }
-    } else {
-        if(lastStableTelemetry.getLastWaypointID() > waypointIndex) {
-            isAhead = true;
-        }
-    }
-
-    // The rendevouz is divided in three steps
-
-    // First the drones navigate to the waypoint closest to the shared border
-    // If the drones are already coming from/going to the waypoint closest they don't need this command
-    if((!isLeft || lastStableTelemetry.getLastWaypointID() != waypointIndex) &&
-            (isLeft || lastStableTelemetry.getNextWaypointID() != waypointIndex)) {
-        MobilityCommand *firstCommand = new MobilityCommand();
-        firstCommand->setCommandType(GOTO_WAYPOINT);
-
-        // If the drone is ahead of the shared border navigate to the next waypoint after it
-        if(isAhead) {
-            firstCommand->setParam1(waypointIndex + 1);
-        } else {
-            firstCommand->setParam1(waypointIndex);
-        }
-
-        sendCommand(firstCommand);
-    }
-
-    // Them the drones meet at the shared border
-    MobilityCommand *secondCommand = new MobilityCommand();
-    secondCommand->setCommandType(GOTO_COORDS);
-    secondCommand->setParam1(sharedBorderCoords.x);
-    secondCommand->setParam2(sharedBorderCoords.y);
-    secondCommand->setParam3(sharedBorderCoords.z);
-
-    // After the drones reach the coords they will be oriented
-    // going from waypointIndex to waypointIndex + 1
-    secondCommand->setParam4(waypointIndex + 1);
-    secondCommand->setParam5(waypointIndex);
-    sendCommand(secondCommand);
-
-
-    // Them the drones reverses
-    // Only the drone on the left needs to reverse
-    // since both drones are oriented unreversed
-    if(isLeft) {
-        MobilityCommand *thirdCommand = new MobilityCommand();
-        thirdCommand->setCommandType(REVERSE);
-        sendCommand(thirdCommand);
     }
 }
 

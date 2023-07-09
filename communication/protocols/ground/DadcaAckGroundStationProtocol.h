@@ -82,9 +82,6 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
         // Resets parameters
         virtual void resetParameters();
     private:
-        // Sends sequence of orders that defines a rendevouz point, navigates
-        // to it and reverses
-        virtual void rendevouz();
 
         // Updates payload that communication will send
         virtual void updatePayload();
