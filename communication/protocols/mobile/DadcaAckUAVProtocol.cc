@@ -163,12 +163,14 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 break;
             }
-            case DadcaAckMessageType::PAIR_CONFIRM:
+            case DadcaAckMessageType::PAIR_CONFIRM: // partially equivalent to UAV_MESSAGES?
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
                     break;
                 }
+
+                updateAcks(payload->getAcks());
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
@@ -177,11 +179,12 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                         // If both drones are traveling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
                         if((lastStableTelemetry.isReversed() != payload->getReversed()) || (tour.size() == 0 || destinationIsGroundstation)) {
-                            // Exchanging imaginary data to the drone closest to the start of the mission
+                            updateRanges(payload->getMessageRanges());
+
+                            // Exchanging imaginary data to the drone closest to the start of the mission - eqiova;emt tp UAV_MESSAGES behavior?
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
                                 currentDataLoad = currentDataLoad + payload->getDataLength();
-
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -219,26 +222,10 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             {
                 if(!isTimedout() && communicationStatus == FREE) {
                     std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
+                    std::cout << payload->getMessageRanges() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
 
-                    nlohmann::json jsonMap = nlohmann::json::parse(payload->getMessageRanges());
-                    std::unordered_map<std::string, std::pair<long,long>> receivedRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
-
-                    ///// UPDATE RANGES START
-                    for (const auto& pair : receivedRanges) {
-                        const std::string& key = pair.first;
-                        const std::pair<long, long>& receivedRange = pair.second;
-
-                        auto iter = messageRanges.find(key);
-                        if (iter != messageRanges.end()) {
-                            std::pair<long, long>& messageRange = iter->second;
-                            messageRange.first = std::min(messageRange.first, receivedRange.first);
-                            messageRange.second = std::max(messageRange.second, receivedRange.second);
-                        } else {
-                            messageRanges[key] = receivedRange;
-                        }
-                    }
-                    ///// UPDATE RANGES END
+                    updateRanges(payload->getMessageRanges());
 
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
@@ -264,6 +251,52 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
+}
+
+void DadcaAckUAVProtocol::updateAcks(const char *incomingAcks) {
+    if (strcmp(incomingAcks, "") == 0) {
+        return;
+    }
+
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingAcks);
+    std::unordered_map<std::string, long> incomingAcksMap = jsonMap.get<std::unordered_map<std::string, long>>();
+
+    for (const auto& pair : incomingAcksMap) {
+        const std::string& key = pair.first;
+        long incomingAck = pair.second;
+
+        auto iter = acks.find(key);
+        if (iter != acks.end()) {
+            iter->second = std::max(iter->second, incomingAck);
+        } else {
+            acks[key] = incomingAck;
+        }
+    }
+}
+
+void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
+    if (strcmp(incomingRanges, "") == 0) {
+        return;
+    }
+
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingRanges);
+    std::unordered_map<std::string, std::pair<long,long>> receivedRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
+
+    ///// UPDATE RANGES START
+    for (const auto& pair : receivedRanges) {
+        const std::string& key = pair.first;
+        const std::pair<long, long>& receivedRange = pair.second;
+
+        auto iter = messageRanges.find(key);
+        if (iter != messageRanges.end()) {
+            std::pair<long, long>& messageRange = iter->second;
+            messageRange.first = std::min(messageRange.first, receivedRange.first);
+            messageRange.second = std::max(messageRange.second, receivedRange.second);
+        } else {
+            messageRanges[key] = receivedRange;
+        }
+    }
+    ///// UPDATE RANGES END
 }
 
 void DadcaAckUAVProtocol::rendevouz() {
@@ -429,11 +462,13 @@ void DadcaAckUAVProtocol::updatePayload() {
         // Set acks
         payload->setAcks(jsonMap.dump().c_str());
 
-        if (payload->getMessageType() == DadcaAckMessageType::BEARER) { // UAV_MESSAGES equivalent?
+        if (payload->getMessageType() == DadcaAckMessageType::BEARER
+                || payload->getMessageType() == DadcaAckMessageType::PAIR_CONFIRM) { // UAV_MESSAGES equivalent?
             nlohmann::json jsonMap = messageRanges;
 
-            // Set acks
+            // Set message ranges
             payload->setMessageRanges(jsonMap.dump().c_str());
+            std::cout << "UAV forwarding message ranges: " << payload->getMessageRanges() << std::endl;
         }
 
         CommunicationCommand *command = new CommunicationCommand();

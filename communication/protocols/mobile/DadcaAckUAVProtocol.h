@@ -85,6 +85,9 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         // Resets parameters
         virtual void resetParameters();
     private:
+        virtual void updateAcks(const char *incomingAcks);
+        virtual void updateRanges(const char *incomingRanges);
+
         // Sends sequence of orders that defines a rendevouz point, navigates
         // to it and reverses
         virtual void rendevouz();

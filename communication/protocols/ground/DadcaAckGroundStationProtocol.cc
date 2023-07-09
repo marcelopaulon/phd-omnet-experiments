@@ -131,7 +131,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                 }
                 break;
             }
-            case DadcaAckMessageType::PAIR_CONFIRM:
+            case DadcaAckMessageType::PAIR_CONFIRM: // equivalent to UAV_MESSAGES ?
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
@@ -149,6 +149,8 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
                                 currentDataLoad = currentDataLoad + payload->getDataLength();
+
+                                updateAcks(payload->getMessageRanges());
                             }
 
                             // Updating data load
@@ -166,23 +168,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                     std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
 
-                    nlohmann::json jsonMap = nlohmann::json::parse(payload->getMessageRanges());
-                    std::unordered_map<std::string, std::pair<long,long>> receivedMessageRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
-
-                    // BEGIN UPDATE ACKS
-                    for (const auto& pair : receivedMessageRanges) {
-                        const std::string& key = pair.first;
-                        const std::pair<long, long>& range = pair.second;
-                        long lastReceivedMessageSeq = range.second;
-
-                        auto iter = acks.find(key);
-                        if (iter != acks.end()) {
-                            iter->second = lastReceivedMessageSeq;
-                        } else {
-                            acks[key] = lastReceivedMessageSeq;
-                        }
-                    }
-                    // END UPDATE ACKS
+                    updateAcks(payload->getMessageRanges());
 
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
@@ -212,6 +198,30 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
+}
+
+void DadcaAckGroundStationProtocol::updateAcks(const char *incomingMessageRanges) {
+    if (strcmp(incomingMessageRanges, "") == 0) {
+        return;
+    }
+
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingMessageRanges);
+    std::unordered_map<std::string, std::pair<long,long>> receivedMessageRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
+
+    // BEGIN UPDATE ACKS
+    for (const auto& pair : receivedMessageRanges) {
+        const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        long lastReceivedMessageSeq = range.second;
+
+        auto iter = acks.find(key);
+        if (iter != acks.end()) {
+            iter->second = lastReceivedMessageSeq;
+        } else {
+            acks[key] = lastReceivedMessageSeq;
+        }
+    }
+    // END UPDATE ACKS
 }
 
 void DadcaAckGroundStationProtocol::updatePayload() {

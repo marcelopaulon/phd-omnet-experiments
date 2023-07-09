@@ -83,6 +83,8 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
         virtual void resetParameters();
     private:
 
+        void updateAcks(const char *incomingMessageRanges);
+
         // Updates payload that communication will send
         virtual void updatePayload();
         virtual void setTarget(const char *target);
