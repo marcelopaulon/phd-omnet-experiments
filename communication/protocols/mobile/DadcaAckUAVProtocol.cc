@@ -374,6 +374,13 @@ void DadcaAckUAVProtocol::updatePayload() {
             std::cout << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
             break;
         }
+        case REQUESTING:
+        {
+            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST_BASE_PING);
+            payload->setDestinationID(tentativeTarget);
+            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            break;
+        }
         case PAIRED:
         case PAIRED_FINISHED:
         {
@@ -385,7 +392,6 @@ void DadcaAckUAVProtocol::updatePayload() {
             break;
         }
         case COLLECTING:
-        case REQUESTING:
             break;
     }
 
