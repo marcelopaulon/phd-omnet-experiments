@@ -90,6 +90,17 @@ void DadcaAckProtocolSensor::updatePayload() {
     payload->setMessageType(DadcaAckMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);
+
+    // Send last Message index
+    std::unordered_map<std::string, std::pair<long, long>> ranges;
+    std::pair<long, long> r(1, Messages);
+    ranges[this->getParentModule()->getFullName()] = r;
+
+    nlohmann::json jsonMap = ranges;
+
+    // Set Message Ranges field
+    payload->setMessageRanges(jsonMap.dump().c_str());
+
     std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     lastPayload = *payload;

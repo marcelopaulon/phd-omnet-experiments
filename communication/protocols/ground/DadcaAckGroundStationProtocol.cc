@@ -138,7 +138,6 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                     break;
                 }
 
-
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
                     std::cout << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
@@ -161,11 +160,30 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                }
                break;
             }
-            case DadcaAckMessageType::BEARER:
+            case DadcaAckMessageType::BEARER: // equivalent to UAV_MESSAGES ?
             {
                 if(!isTimedout() && communicationStatus == FREE) {
                     std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
+
+                    nlohmann::json jsonMap = nlohmann::json::parse(payload->getMessageRanges());
+                    std::unordered_map<std::string, std::pair<long,long>> receivedMessageRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
+
+                    // BEGIN UPDATE ACKS
+                    for (const auto& pair : receivedMessageRanges) {
+                        const std::string& key = pair.first;
+                        const std::pair<long, long>& range = pair.second;
+                        long lastReceivedMessageSeq = range.second;
+
+                        auto iter = acks.find(key);
+                        if (iter != acks.end()) {
+                            iter->second = lastReceivedMessageSeq;
+                        } else {
+                            acks[key] = lastReceivedMessageSeq;
+                        }
+                    }
+                    // END UPDATE ACKS
+
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
                     initiateTimeout(timeoutDuration);

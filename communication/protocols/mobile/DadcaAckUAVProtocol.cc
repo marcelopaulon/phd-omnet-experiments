@@ -220,6 +220,26 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                 if(!isTimedout() && communicationStatus == FREE) {
                     std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
+
+                    nlohmann::json jsonMap = nlohmann::json::parse(payload->getMessageRanges());
+                    std::unordered_map<std::string, std::pair<long,long>> receivedRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
+
+                    ///// UPDATE RANGES START
+                    for (const auto& pair : receivedRanges) {
+                        const std::string& key = pair.first;
+                        const std::pair<long, long>& receivedRange = pair.second;
+
+                        auto iter = messageRanges.find(key);
+                        if (iter != messageRanges.end()) {
+                            std::pair<long, long>& messageRange = iter->second;
+                            messageRange.first = std::min(messageRange.first, receivedRange.first);
+                            messageRange.second = std::max(messageRange.second, receivedRange.second);
+                        } else {
+                            messageRanges[key] = receivedRange;
+                        }
+                    }
+                    ///// UPDATE RANGES END
+
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
                     initiateTimeout(timeoutDuration);
@@ -408,6 +428,13 @@ void DadcaAckUAVProtocol::updatePayload() {
 
         // Set acks
         payload->setAcks(jsonMap.dump().c_str());
+
+        if (payload->getMessageType() == DadcaAckMessageType::BEARER) { // UAV_MESSAGES equivalent?
+            nlohmann::json jsonMap = messageRanges;
+
+            // Set acks
+            payload->setMessageRanges(jsonMap.dump().c_str());
+        }
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
