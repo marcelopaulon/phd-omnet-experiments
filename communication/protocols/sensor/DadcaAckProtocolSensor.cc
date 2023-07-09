@@ -41,15 +41,44 @@ void DadcaAckProtocolSensor::initialize(int stage)
 void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
     auto payload = pk->peekAtBack<DadcaAckMessage>(B(34), 1);
 
-
     if(payload != nullptr) {
-        if(payload->getMessageType() == DadcaAckMessageType::HEARTBEAT)
+        if(payload->getMessageType() == DadcaAckMessageType::UAV_PING_HEARTBEAT)
         {
-            std::cout << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
+            std::cout << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
             setTarget(tentativeTargetName.c_str());
+
+            nlohmann::json jsonMap = nlohmann::json::parse(payload->getAcks());
+            std::unordered_map<std::string, long> receivedAcks = jsonMap.get<std::unordered_map<std::string, long>>();
+
+            const char *myId = this->getParentModule()->getFullName();
+
+            auto iter = receivedAcks.find(myId);
+            if (iter != receivedAcks.end()) {
+                std::cout << "Key found. Value: " << iter->second << std::endl;
+                long lastReceivedAck = iter->second;
+                // if m->acks[MyId] > LastAckedMessage:
+                if (lastReceivedAck > LastAckedMessage) {
+                    //   LastAckedMessage = m->acks[MyId]
+                    LastAckedMessage = lastReceivedAck;
+                    //   clear acked messages
+                    // TODO
+                }
+            } else {
+                std::cout << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
+            }
+
+            // send $SENSOR\_MESSAGES$
+            //  - Messages
+
             updatePayload();
+        } else if(payload->getMessageType() == DadcaAckMessageType::INT_GEN_MESSAGE)
+        {
+            Messages += 1;
+            // schedule INT_GEN_MESSAGE to the next simulation second.
+        } else {
+            std::cout << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
         }
     }
 }

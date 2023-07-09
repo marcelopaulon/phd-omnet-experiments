@@ -20,7 +20,7 @@ import projeto.communication.protocols.base.CommunicationProtocolBase;
 simple DadcaAckProtocolSensor extends CommunicationProtocolBase
 {
     parameters:
-        @class(DadcaProtocolSensor);
+        @class(DadcaAckProtocolSensor);
         @signal[dataLoad](type=long); // Declaration of dataLoad signal used to track current data load that the drone is carrying
         double timeoutDuration @unit(s) = default(3s);
 }

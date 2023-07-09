@@ -16,7 +16,9 @@
 #ifndef __PROJETO_DadcaAckProtocolSensor_H_
 #define __PROJETO_DadcaAckProtocolSensor_H_
 
+#include <unordered_map>
 #include <omnetpp.h>
+#include "../json.hpp"
 #include "../base/CommunicationProtocolBase.h"
 #include "../../messages/network/DadcaAckMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
@@ -26,9 +28,9 @@ using namespace omnetpp;
 namespace projeto {
 
 /*
- * DadcaProtocol implements a protocol that recieves and sends DadcaMessages to simulate a
+ * DadcaAckProtocol implements a protocol that receives and sends DadcaAckMessages to simulate a
  * drone collecting data from sensors and sharing it with other drones. This protocol implements
- * the DADCA protocol.
+ * the DADCA-ACK (Reliable DADCA) protocol.
  */
 class DadcaAckProtocolSensor : public CommunicationProtocolBase
 {
@@ -39,6 +41,9 @@ class DadcaAckProtocolSensor : public CommunicationProtocolBase
         std::string tentativeTargetName;
 
         DadcaAckMessage lastPayload = DadcaAckMessage();
+
+        int Messages = 0;
+        int LastAckedMessage = 0;
 
     protected:
         virtual void initialize(int stage) override;

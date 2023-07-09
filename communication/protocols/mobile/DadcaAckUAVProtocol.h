@@ -16,7 +16,9 @@
 #ifndef __PROJETO_DadcaAckUAVProtocol_H_
 #define __PROJETO_DadcaAckUAVProtocol_H_
 
+#include <unordered_map>
 #include <omnetpp.h>
+#include "../json.hpp"
 #include "../base/CommunicationProtocolBase.h"
 #include "../../messages/network/DadcaAckMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
@@ -28,7 +30,7 @@ namespace projeto {
 enum CommunicationStatus { FREE=0, REQUESTING=1, PAIRED=2, COLLECTING=3, PAIRED_FINISHED=4 };
 
 /*
- * DadcaAckUAVProtocol implements a protocol that receives and sends DadcaMessages to simulate a
+ * DadcaProtocol implements a protocol that recieves and sends DadcaAckMessages to simulate a
  * drone collecting data from sensors and sharing it with other drones. This protocol implements
  * the DADCA protocol.
  */
@@ -65,6 +67,11 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         Telemetry lastStableTelemetry = Telemetry();
 
         DadcaAckMessage lastPayload = DadcaAckMessage();
+
+
+        std::unordered_map<std::string, long> acks; //Map<SensorId, LastAcked> acks;
+        std::unordered_map<std::string, long> messages; //Map<SensorId, Messages> messages;
+        std::unordered_map<std::string, std::pair<long, long>> messageRanges; //Map<SensorId, Range> messageRanges;
 
     protected:
         virtual void initialize(int stage) override;

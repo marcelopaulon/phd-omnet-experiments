@@ -36,7 +36,7 @@ void DadcaAckUAVProtocol::initialize(int stage)
     if(stage == INITSTAGE_LOCAL) {
         timeoutDuration = par("timeoutDuration");
 
-        int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
+        //int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
         // Signal that carries current data load and is emitted every time it is updated
         dataLoadSignalID = registerSignal("dataLoad");
         emit(dataLoadSignalID, currentDataLoad);
@@ -96,7 +96,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;
 
         switch(payload->getMessageType()) {
-            case DadcaAckMessageType::HEARTBEAT:
+            case DadcaAckMessageType::UAV_PING_HEARTBEAT:
             {
                 // No communication from other drones matters while the drone is executing
                 // or if the drone is recharging/shutdown
@@ -126,12 +126,12 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
+                        std::cout << this->getParentModule()->getId() << " recieved UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
                     }
                 }
                 break;
             }
-            case DadcaAckMessageType::PAIR_REQUEST:
+            case DadcaAckMessageType::PAIR_REQUEST_BASE_PING:
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
@@ -149,11 +149,11 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 if(isTimedout()) {
                     if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
+                        std::cout << payload->getDestinationID() << " received a pair request while timed out from " << payload->getSourceID() << endl;
                         communicationStatus = PAIRED;
                     }
                 } else {
-                    std::cout << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
+                    std::cout << payload->getDestinationID() << " received a pair request while not timed out from  " << payload->getSourceID() << endl;
                     tentativeTarget = payload->getSourceID();
                     tentativeTargetName = pk->getName();
                     initiateTimeout(timeoutDuration);
@@ -170,12 +170,11 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                     break;
                 }
 
-
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    std::cout << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
-                        // If both drones are travelling in the same direction, the pairing is canceled
+                        // If both drones are traveling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
                         if((lastStableTelemetry.isReversed() != payload->getReversed()) || (tour.size() == 0 || destinationIsGroundstation)) {
                             // Exchanging imaginary data to the drone closest to the start of the mission
@@ -219,7 +218,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             case DadcaAckMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
+                    std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
@@ -229,6 +228,10 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                 }
                 break;
             }
+
+            default:
+                std::cout << std::endl << "[DadcaAckUAV] Ignoring received message " << payload->getMessageType() << std::endl;
+                break;
         }
         updatePayload();
     }
@@ -367,15 +370,8 @@ void DadcaAckUAVProtocol::updatePayload() {
     switch(communicationStatus) {
         case FREE:
         {
-            payload->setMessageType(DadcaAckMessageType::HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to heartbeat" << endl;
-            break;
-        }
-        case REQUESTING:
-        {
-            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST);
-            payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            payload->setMessageType(DadcaAckMessageType::UAV_PING_HEARTBEAT);
+            std::cout << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
             break;
         }
         case PAIRED:
@@ -389,6 +385,7 @@ void DadcaAckUAVProtocol::updatePayload() {
             break;
         }
         case COLLECTING:
+        case REQUESTING:
             break;
     }
 
@@ -400,6 +397,11 @@ void DadcaAckUAVProtocol::updatePayload() {
             payload->getLastWaypointID() != lastPayload.getLastWaypointID() ||
             payload->getReversed() != lastPayload.getReversed()) {
         lastPayload = *payload;
+
+        nlohmann::json jsonMap = acks;
+
+        // Set acks
+        payload->setAcks(jsonMap.dump().c_str());
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
