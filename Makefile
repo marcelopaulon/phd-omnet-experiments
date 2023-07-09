@@ -45,10 +45,13 @@ OBJS = \
     $O/communication/modules/base/UdpSinkMobileNode.o \
     $O/communication/modules/base/UdpSinkMobileSensorNode.o \
     $O/communication/protocols/base/CommunicationProtocolBase.o \
+    $O/communication/protocols/ground/DadcaAckGroundStationProtocol.o \
     $O/communication/protocols/ground/SimpleGroundProtocol.o \
+    $O/communication/protocols/mobile/DadcaAckUAVProtocol.o \
     $O/communication/protocols/mobile/DadcaProtocol.o \
     $O/communication/protocols/mobile/SimpleDroneProtocol.o \
     $O/communication/protocols/mobile/ZigzagProtocol.o \
+    $O/communication/protocols/sensor/DadcaAckProtocolSensor.o \
     $O/communication/protocols/sensor/DadcaProtocolSensor.o \
     $O/communication/protocols/sensor/SimpleSensorProtocol.o \
     $O/communication/protocols/sensor/ZigzagProtocolSensor.o \
@@ -75,6 +78,7 @@ OBJS = \
     $O/communication/messages/internal/CommunicationCommand_m.o \
     $O/communication/messages/internal/MobilityCommand_m.o \
     $O/communication/messages/internal/Telemetry_m.o \
+    $O/communication/messages/network/DadcaAckMessage_m.o \
     $O/communication/messages/network/DadcaMessage_m.o \
     $O/communication/messages/network/SimpleMessage_m.o \
     $O/communication/messages/network/ZigzagMessage_m.o \
@@ -86,6 +90,7 @@ MSGFILES = \
     communication/messages/internal/CommunicationCommand.msg \
     communication/messages/internal/MobilityCommand.msg \
     communication/messages/internal/Telemetry.msg \
+    communication/messages/network/DadcaAckMessage.msg \
     communication/messages/network/DadcaMessage.msg \
     communication/messages/network/SimpleMessage.msg \
     communication/messages/network/ZigzagMessage.msg \
