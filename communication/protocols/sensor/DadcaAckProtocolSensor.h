@@ -52,10 +52,16 @@ class DadcaAckProtocolSensor : public CommunicationProtocolBase
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override { return; };
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
+
+        virtual void handleMessage(cMessage *msg) override;
     private:
+        void sendSelfGenPacket();
+
         // Updates payload that communication will send
         virtual void updatePayload();
         virtual void setTarget(const char *target);
+
+        DadcaAckMessage *everySecondControlPacket = nullptr;
     public:
         simsignal_t dataLoadSignalID;
 };

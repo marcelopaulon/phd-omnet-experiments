@@ -35,6 +35,34 @@ void DadcaAckProtocolSensor::initialize(int stage)
 
     if(stage == INITSTAGE_LOCAL) {
         updatePayload();
+
+        sendSelfGenPacket();
+    }
+}
+
+void DadcaAckProtocolSensor::handleMessage(cMessage *msg) {
+    auto message = static_cast<CommunicationCommand *>(msg);
+
+    bool handled = false;
+
+    if (message != nullptr && message->getPayloadTemplate() != nullptr && message->isSelfMessage()) {
+        auto payload = static_cast<const DadcaAckMessage *>(message->getPayloadTemplate());
+
+        if (payload != nullptr && payload->getMessageType() == DadcaAckMessageType::INT_GEN_MESSAGE) {
+            Messages += 1; // Generate a new message
+            cancelAndDelete(msg);
+
+            // Schedule again for next simulated second (INT_GEN_MESSAGE)
+            sendSelfGenPacket();
+
+            handled = true;
+
+            return;
+        }
+    }
+
+    if (!handled) {
+        CommunicationProtocolBase::handleMessage(msg);
     }
 }
 
@@ -73,14 +101,29 @@ void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
             //  - Messages
 
             updatePayload();
-        } else if(payload->getMessageType() == DadcaAckMessageType::INT_GEN_MESSAGE)
-        {
-            Messages += 1;
-            // schedule INT_GEN_MESSAGE to the next simulation second.
         } else {
             std::cout << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
         }
     }
+}
+
+void DadcaAckProtocolSensor::sendSelfGenPacket() {
+    if (everySecondControlPacket != nullptr) {
+        delete everySecondControlPacket;
+    }
+
+    everySecondControlPacket = new DadcaAckMessage();
+    everySecondControlPacket->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+    everySecondControlPacket->setMessageType(DadcaAckMessageType::INT_GEN_MESSAGE);
+    everySecondControlPacket->setSourceID(this->getParentModule()->getId());
+    everySecondControlPacket->setDestinationID(this->getParentModule()->getId());
+
+    CommunicationCommand *command = new CommunicationCommand();
+    command->setCommandType(SET_PAYLOAD);
+    command->setPayloadTemplate(everySecondControlPacket);
+
+    scheduleAt(simTime() + 1.0, command);
 }
 
 void DadcaAckProtocolSensor::updatePayload() {
