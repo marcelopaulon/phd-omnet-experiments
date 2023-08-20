@@ -122,6 +122,7 @@ void DadcaAckProtocolSensor::sendSelfGenPacket() {
     CommunicationCommand *command = new CommunicationCommand();
     command->setCommandType(SET_PAYLOAD);
     command->setPayloadTemplate(everySecondControlPacket);
+    // TODO try with cMessage
 
     scheduleAt(simTime() + 1.0, command);
 }

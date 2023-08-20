@@ -59,6 +59,10 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
+
+        // Current imaginary buffer load
+        int currentBufferLoad=0;
+
         // Stable data load to prevent data loss during pairing
         int stableDataLoad=currentDataLoad;
 
@@ -97,6 +101,7 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         virtual void setTarget(const char *target);
     public:
         simsignal_t dataLoadSignalID;
+        simsignal_t bufferLoadSignalID;
 };
 
 } //namespace

@@ -41,6 +41,9 @@ void DadcaAckUAVProtocol::initialize(int stage)
         dataLoadSignalID = registerSignal("dataLoad");
         emit(dataLoadSignalID, currentDataLoad);
 
+        bufferLoadSignalID = registerSignal("bufferLoad");
+        emit(bufferLoadSignalID, currentBufferLoad);
+
         updatePayload();
 
         WATCH(leftNeighbours);
@@ -49,6 +52,7 @@ void DadcaAckUAVProtocol::initialize(int stage)
         WATCH(tentativeTarget);
         WATCH(lastTarget);
         WATCH(currentDataLoad);
+        WATCH(currentBufferLoad);
     }
 }
 
@@ -297,6 +301,17 @@ void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
         }
     }
     ///// UPDATE RANGES END
+
+    ///// UPDATE BUFFER STATS
+    int newBufferLoad = 0;
+    for (const auto& pair : messageRanges) {
+        const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        newBufferLoad += (range.second - range.first); // TODO: check for int overflow?
+    }
+    currentBufferLoad = newBufferLoad;
+    emit(bufferLoadSignalID, currentBufferLoad);
+    ///// UPDATE BUFFER STATS
 }
 
 void DadcaAckUAVProtocol::rendevouz() {
