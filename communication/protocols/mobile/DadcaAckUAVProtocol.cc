@@ -185,7 +185,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                         if((lastStableTelemetry.isReversed() != payload->getReversed()) || (tour.size() == 0 || destinationIsGroundstation)) {
                             updateRanges(payload->getMessageRanges());
 
-                            // Exchanging imaginary data to the drone closest to the start of the mission - eqiova;emt tp UAV_MESSAGES behavior?
+                            // Exchanging imaginary data to the drone closest to the start of the mission - equivalent to UAV_MESSAGES behavior?
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
                                 currentDataLoad = currentDataLoad + payload->getDataLength();
@@ -274,6 +274,19 @@ void DadcaAckUAVProtocol::updateAcks(const char *incomingAcks) {
             iter->second = std::max(iter->second, incomingAck);
         } else {
             acks[key] = incomingAck;
+        }
+
+        // Discard acked messages
+        auto iterRanges = messageRanges.find(key);
+        if (iterRanges != messageRanges.end()) {
+            std::pair<long, long>& messageRange = iterRanges->second;
+            if (messageRange.first < incomingAck) {
+                messageRange.first = incomingAck;
+            }
+
+            if (messageRange.second < incomingAck) {
+                messageRange.second = incomingAck;
+            }
         }
     }
 }
