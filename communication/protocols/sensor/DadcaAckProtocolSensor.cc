@@ -137,7 +137,7 @@ void DadcaAckProtocolSensor::updatePayload() {
 
     // Send last Message index
     std::unordered_map<std::string, std::pair<long, long>> ranges;
-    std::pair<long, long> r(1, Messages);
+    std::pair<long, long> r(LastAckedMessage, Messages);
     ranges[this->getParentModule()->getFullName()] = r;
 
     nlohmann::json jsonMap = ranges;
