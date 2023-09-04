@@ -38,6 +38,7 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 {
     protected:
         simtime_t timeoutDuration;
+        int maxBufferSize;
 
         // DADCA variables
         // Current tour recieved from telemetry

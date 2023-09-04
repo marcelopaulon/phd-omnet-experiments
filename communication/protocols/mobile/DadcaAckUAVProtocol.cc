@@ -35,6 +35,7 @@ void DadcaAckUAVProtocol::initialize(int stage)
 
     if(stage == INITSTAGE_LOCAL) {
         timeoutDuration = par("timeoutDuration");
+        maxBufferSize = par("maxBufferSize");
 
         //int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
         // Signal that carries current data load and is emitted every time it is updated
@@ -289,6 +290,17 @@ void DadcaAckUAVProtocol::updateAcks(const char *incomingAcks) {
             }
         }
     }
+
+    ///// UPDATE BUFFER STATS
+    long newBufferLoad = 0;
+    for (const auto& pair : messageRanges) {
+        //const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        newBufferLoad += (range.second - range.first);
+    }
+    currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
+    emit(bufferLoadSignalID, currentBufferLoad);
+    ///// UPDATE BUFFER STATS
 }
 
 void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
@@ -299,6 +311,9 @@ void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
     nlohmann::json jsonMap = nlohmann::json::parse(incomingRanges);
     std::unordered_map<std::string, std::pair<long,long>> receivedRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
 
+    assert(currentBufferLoad <= maxBufferSize);
+    long newBufferLoadTemp = currentBufferLoad;
+
     ///// UPDATE RANGES START
     for (const auto& pair : receivedRanges) {
         const std::string& key = pair.first;
@@ -307,22 +322,42 @@ void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
         auto iter = messageRanges.find(key);
         if (iter != messageRanges.end()) {
             std::pair<long, long>& messageRange = iter->second;
+            long originalLoad = (messageRange.second - messageRange.first);
             messageRange.first = std::min(messageRange.first, receivedRange.first);
             messageRange.second = std::max(messageRange.second, receivedRange.second);
+            long newLoad = (messageRange.second - messageRange.first);
+            if (newLoad != originalLoad) {
+                if (newBufferLoadTemp + newLoad > maxBufferSize) {
+                    // Remove ranges that would make the buffer size exceed maxBufferSize
+                    messageRange.second -= (newBufferLoadTemp + newLoad - maxBufferSize);
+                    newLoad = (messageRange.second - messageRange.first);
+                }
+                newBufferLoadTemp += (newLoad - originalLoad);
+            }
         } else {
-            messageRanges[key] = receivedRange;
+            std::pair<long, long> newRange = receivedRange;
+            long newLoad = (newRange.second - newRange.first);
+            if (newBufferLoadTemp + newLoad > maxBufferSize) {
+                // Remove ranges that would make the buffer size exceed maxBufferSize
+                newRange.second -= (newBufferLoadTemp + newLoad - maxBufferSize);
+                newLoad = (newRange.second - newRange.first);
+            }
+            newBufferLoadTemp += newLoad;
+            messageRanges[key] = newRange;
         }
     }
     ///// UPDATE RANGES END
 
     ///// UPDATE BUFFER STATS
-    int newBufferLoad = 0;
+    long newBufferLoad = 0;
     for (const auto& pair : messageRanges) {
-        const std::string& key = pair.first;
+        //const std::string& key = pair.first;
         const std::pair<long, long>& range = pair.second;
-        newBufferLoad += (range.second - range.first); // TODO: check for int overflow?
+        newBufferLoad += (range.second - range.first);
     }
-    currentBufferLoad = newBufferLoad;
+    std::cout << currentBufferLoad << std::endl << newBufferLoadTemp << std::endl << newBufferLoad;
+    assert(newBufferLoadTemp == newBufferLoad); // Sanity check
+    currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
     emit(bufferLoadSignalID, currentBufferLoad);
     ///// UPDATE BUFFER STATS
 }

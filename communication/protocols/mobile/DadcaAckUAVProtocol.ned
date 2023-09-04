@@ -24,4 +24,5 @@ simple DadcaAckUAVProtocol extends CommunicationProtocolBase
         @signal[dataLoad](type=long); // Declaration of dataLoad signal used to track current data load that the drone is carrying
         @signal[bufferLoad](type=long);
         double timeoutDuration @unit(s) = default(3s);
+        int maxBufferSize = default(10000);
 }
