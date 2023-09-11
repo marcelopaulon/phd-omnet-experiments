@@ -1,0 +1,12 @@
+[Config ##{NETWORK_NAME}##-DADCA]
+description = Simulation-DADCA
+network = ##{NETWORK_NAME}##
+extends = Dadca
+*.numUAVs = ${numUAVs=2,4,8,16}
+
+[Config ##{NETWORK_NAME}##-DADCA-ACK]
+description = Simulation-DADCA-ACK
+network = ##{NETWORK_NAME}##
+extends = DadcaAck
+*.numUAVs = ${numUAVs=2,4,8,16}
+
