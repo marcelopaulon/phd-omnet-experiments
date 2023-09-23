@@ -33,7 +33,9 @@ public:
     void visit(cObject *obj) override {
         EV << "Object name: " << obj->getFullName() << endl;
 
-        if (strcmp(obj->getName(), "sensors") == 0) {
+        std::string name = obj->getName();
+
+        if (name.find("sensors") != std::string::npos) {
             cModule *module = check_and_cast<cModule*>(obj);
             cObject *mobilityObj = module->findObject("mobility");
             StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
