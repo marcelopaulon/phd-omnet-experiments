@@ -27,6 +27,7 @@ public:
     std::vector<double> x_coords;
     std::vector<double> y_coords;
     int numDrones = 0;
+    bool splitDrones = false;
 
     Coord groundStationPosition;
 
@@ -34,6 +35,10 @@ public:
         EV << "Object name: " << obj->getFullName() << endl;
 
         std::string name = obj->getName();
+
+        if (numDrones == 0 && !splitDrones) {
+            numDrones = 1;
+        }
 
         if (name.find("sensors") != std::string::npos) {
             cModule *module = check_and_cast<cModule*>(obj);
@@ -48,7 +53,7 @@ public:
             EV << "Sensor position: (" << x << ", " << y << ", " << z << ")" << endl;
             x_coords.push_back(x);
             y_coords.push_back(y);
-        } else if (strcmp(obj->getName(), "quads") == 0) {
+        } else if (splitDrones && strcmp(obj->getName(), "quads") == 0) {
             numDrones++;
             EV << "Drone loaded" << endl;
         } else if (strcmp(obj->getName(), "groundStation") == 0) {
@@ -79,7 +84,7 @@ public:
             }
             outputFile << "DEMAND_SECTION" << std::endl;
             outputFile << "1 0" << std::endl; // Ground station has demand=0
-            int nUAVS = 2;
+            int nUAVS = 1;
             for (int i = 0; i < nSensors; i++) {
                 outputFile << (i + 2) << " " << nUAVS  << std::endl;
             }
