@@ -24,10 +24,15 @@ Define_Module(GroundStation);
 
 class MyVisitor : public cVisitor {
 public:
+    MyVisitor(std::vector<DroneMobility *> &instancesRef) : instances(instancesRef) {
+
+    }
+
     std::vector<double> x_coords;
     std::vector<double> y_coords;
     int numDrones = 0;
     bool splitDrones = false;
+    std::vector<DroneMobility *> &instances;
 
     Coord groundStationPosition;
 
@@ -53,8 +58,16 @@ public:
             EV << "Sensor position: (" << x << ", " << y << ", " << z << ")" << endl;
             x_coords.push_back(x);
             y_coords.push_back(y);
-        } else if (splitDrones && strcmp(obj->getName(), "quads") == 0) {
-            numDrones++;
+        } else if (strcmp(obj->getName(), "quads") == 0) {
+            if (splitDrones) {
+                numDrones++;
+            }
+
+            cModule *module = check_and_cast<cModule*>(obj);
+            cObject *mobilityObj = module->findObject("mobility");
+            DroneMobility *mobility = check_and_cast<DroneMobility*>(mobilityObj);
+            instances.push_back(mobility);
+
             EV << "Drone loaded" << endl;
         } else if (strcmp(obj->getName(), "groundStation") == 0) {
             cModule *module = check_and_cast<cModule*>(obj);
@@ -139,6 +152,10 @@ void GroundStation::handleMessage(cMessage *msg) {
     if (msg->isSelfMessage()) {
         if (strcmp(msg->getName(), "PostInitializationMessage") == 0) {
             doPostInitializationTasks();
+            for (DroneMobility * mob : droneMobilityInstances) {
+                // Reinitialize mobility so it reads from the new paths file
+                mob->initialize(5000);
+            }
         }
         delete msg;
     }
@@ -150,7 +167,7 @@ void GroundStation::doPostInitializationTasks() {
 
         cModule *topModule = getModuleByPath("<root>");  // Get the top-level module
 
-        MyVisitor visitor;
+        MyVisitor visitor(droneMobilityInstances);
         topModule->forEachChild(&visitor);
 
         cObject *mobilityObj = this->findObject("mobility");

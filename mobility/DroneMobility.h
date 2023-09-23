@@ -100,7 +100,6 @@ class DroneMobility : public VehicleMobility
         Coord homeCoords;
 
     protected:
-        virtual void initialize(int stage) override;
         virtual void setInitialPosition() override;
         virtual void readWaypointsFromFile(const char *fileName) override;
 
@@ -126,6 +125,7 @@ class DroneMobility : public VehicleMobility
         virtual void executeCommand();
 
     public:
+        virtual void initialize(int stage) override;
         simsignal_t reverseSignalID;
     private:
         Coord tempSpeed;

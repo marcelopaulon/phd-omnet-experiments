@@ -18,6 +18,8 @@
 #include <algorithm>
 #include <iterator>
 
+#include "mobility/DroneMobility.h"
+
 using std::cout; using std::endl;
 using std::string; using std::reverse;
 
@@ -34,6 +36,7 @@ class GroundStation : public cSimpleModule  {
     std::vector<double> xRouteCoords;
     std::vector<double> yRouteCoords;
     std::vector<std::vector<int>> routes;
+    std::vector<DroneMobility *> droneMobilityInstances;
     double routeCost = 0.0;
     void doPostInitializationTasks();
   protected:
