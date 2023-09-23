@@ -62,7 +62,8 @@ InstanceCVRPLIB::InstanceCVRPLIB(std::string pathToInstance, bool isRoundingInte
 		dist_mtx = std::vector < std::vector< double > >(nbClients + 1, std::vector <double>(nbClients + 1));
 		for (int i = 0; i <= nbClients; i++)
 		{
-			for (int j = 0; j <= nbClients; j++)
+		    dist_mtx[i][0] = 0.; // TODO: CHANGED 2023-09-23 to set one-way route (added line)
+			for (int j = 1; j <= nbClients; j++) // TODO: CHANGED 2023-09-23 to set one-way route (loop starts from 1 instead of 0)
 			{
 				dist_mtx[i][j] = std::sqrt(
 					(x_coords[i] - x_coords[j]) * (x_coords[i] - x_coords[j])
