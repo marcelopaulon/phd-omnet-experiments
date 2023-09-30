@@ -107,7 +107,7 @@ public:
             outputFile << "EOF" << std::endl;
 
             outputFile.close(); // Close the file
-            std::cout << "Data written to the file successfully." << std::endl;
+            EV_DETAIL << "Data written to the file successfully." << std::endl;
         } else {
             std::cerr << "Error opening the file." << std::endl;
         }
@@ -126,12 +126,12 @@ void GroundStation::initialize(){
     scheduleAt(simTime(), postInitMsg); // Schedule the message at current simulation time
 
 
-    std::cout << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
+    EV_DETAIL << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
 }
 int GroundStation::processMessage(inet::Packet *msg) {
 
     // O getname � o payload
-    std::cout  << "GROUND-STATION-" << internalMobNodeId << " received: " << msg->getName() << endl;
+    EV_DETAIL  << "GROUND-STATION-" << internalMobNodeId << " received: " << msg->getName() << endl;
 
     return 1;
 
@@ -148,7 +148,7 @@ string GroundStation::generateNextPacketToSend(){
 
 void GroundStation::handleMessage(cMessage *msg) {
 
-    std::cout  << " GroundStation::handleMessage: " << msg << endl;
+    EV_DETAIL  << " GroundStation::handleMessage: " << msg << endl;
     if (msg->isSelfMessage()) {
         if (strcmp(msg->getName(), "PostInitializationMessage") == 0) {
             doPostInitializationTasks();
@@ -232,7 +232,7 @@ void GroundStation::doPostInitializationTasks() {
                         outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
 
                         outputFile.close(); // Close the file
-                        std::cout << "Data written to the file successfully." << std::endl;
+                        EV_DETAIL << "Data written to the file successfully." << std::endl;
                     } else {
                         std::cerr << "Error opening the file." << std::endl;
                     }
@@ -245,7 +245,7 @@ void GroundStation::doPostInitializationTasks() {
                         double gsy = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).longitude.get();
                         outputFile << "0\t0\t0\t16\t0\t0\t0\t0\t" << gsx  << "\t" << gsy << "\t0\t1" << std::endl;
                         outputFile.close(); // Close the file
-                        std::cout << "Data written to the file successfully." << std::endl;
+                        EV_DETAIL << "Data written to the file successfully." << std::endl;
                     } else {
                         std::cerr << "Error opening the file." << std::endl;
                     }
@@ -255,8 +255,8 @@ void GroundStation::doPostInitializationTasks() {
             routeCost = indiv.eval.penalizedCost;
         }
     }
-    catch (const string& e) { std::cout << "EXCEPTION | " << e << std::endl; }
-    catch (const std::exception& e) { std::cout << "EXCEPTION | " << e.what() << std::endl; }
+    catch (const string& e) { EV_ERROR << "EXCEPTION | " << e << std::endl; }
+    catch (const std::exception& e) { EV_ERROR << "EXCEPTION | " << e.what() << std::endl; }
 }
 
 } //namespace

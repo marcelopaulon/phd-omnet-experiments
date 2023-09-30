@@ -18,13 +18,13 @@ void MobileSensorNode::initialize(){
 
     //this->myType = static_cast<mobileNodeType>(par("nodeType").intValue());
 
-    std::cout << "Sensor initialization of internalMobNodeId " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
+    EV_DETAIL << "Sensor initialization of internalMobNodeId " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
 
 }
 int MobileSensorNode::processMessage(inet::Packet *msg) {
 
     // GETNAME returns the payload
-    std::cout  << "Sensor-" << internalMobNodeId << " received: " << msg->getName() << endl;
+    EV_DETAIL  << "Sensor-" << internalMobNodeId << " received: " << msg->getName() << endl;
 
     this->shouldSendAMsg = true;
 
@@ -44,7 +44,7 @@ string MobileSensorNode::generateNextPacketToSend(){
 
 void MobileSensorNode::handleMessage(cMessage *msg) {
 
-    std::cout  << " MobileSensorNode::handleMessage: " << msg << endl;
+    EV_DETAIL  << " MobileSensorNode::handleMessage: " << msg << endl;
 
 }
 

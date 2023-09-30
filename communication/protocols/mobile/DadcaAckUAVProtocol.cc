@@ -131,7 +131,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
+                        EV_DETAIL << this->getParentModule()->getId() << " recieved UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
                     }
                 }
                 break;
@@ -154,11 +154,11 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 if(isTimedout()) {
                     if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " received a pair request while timed out from " << payload->getSourceID() << endl;
+                        EV_DETAIL << payload->getDestinationID() << " received a pair request while timed out from " << payload->getSourceID() << endl;
                         communicationStatus = PAIRED;
                     }
                 } else {
-                    std::cout << payload->getDestinationID() << " received a pair request while not timed out from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " received a pair request while not timed out from  " << payload->getSourceID() << endl;
                     tentativeTarget = payload->getSourceID();
                     tentativeTargetName = pk->getName();
                     initiateTimeout(timeoutDuration);
@@ -179,7 +179,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
                         // If both drones are traveling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
@@ -226,8 +226,8 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             case DadcaAckMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
-                    std::cout << payload->getMessageRanges() << endl;
+                    EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
+                    EV_DETAIL << payload->getMessageRanges() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
 
                     updateRanges(payload->getMessageRanges());
@@ -242,7 +242,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             }
 
             default:
-                std::cout << std::endl << "[DadcaAckUAV] Ignoring received message " << payload->getMessageType() << std::endl;
+                EV_DETAIL << std::endl << "[DadcaAckUAV] Ignoring received message " << payload->getMessageType() << std::endl;
                 break;
         }
         updatePayload();
@@ -355,7 +355,7 @@ void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
         const std::pair<long, long>& range = pair.second;
         newBufferLoad += (range.second - range.first);
     }
-    std::cout << currentBufferLoad << std::endl << newBufferLoadTemp << std::endl << newBufferLoad;
+    EV_DETAIL << currentBufferLoad << std::endl << newBufferLoadTemp << std::endl << newBufferLoad;
     assert(newBufferLoadTemp == newBufferLoad); // Sanity check
     currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
     emit(bufferLoadSignalID, currentBufferLoad);
@@ -487,14 +487,14 @@ void DadcaAckUAVProtocol::updatePayload() {
         case FREE:
         {
             payload->setMessageType(DadcaAckMessageType::UAV_PING_HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
+            EV_DETAIL << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
             break;
         }
         case REQUESTING:
         {
             payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST_BASE_PING);
             payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
             break;
         }
         case PAIRED:
@@ -504,7 +504,7 @@ void DadcaAckUAVProtocol::updatePayload() {
             payload->setDestinationID(tentativeTarget);
             payload->setDataLength(stableDataLoad);
 
-            std::cout << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
         }
         case COLLECTING:
@@ -531,7 +531,7 @@ void DadcaAckUAVProtocol::updatePayload() {
 
             // Set message ranges
             payload->setMessageRanges(jsonMap.dump().c_str());
-            std::cout << "UAV forwarding message ranges: " << payload->getMessageRanges() << std::endl;
+            EV_DETAIL << "UAV forwarding message ranges: " << payload->getMessageRanges() << std::endl;
         }
 
         CommunicationCommand *command = new CommunicationCommand();

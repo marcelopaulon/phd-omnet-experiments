@@ -72,7 +72,7 @@ void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
     if(payload != nullptr) {
         if(payload->getMessageType() == DadcaAckMessageType::UAV_PING_HEARTBEAT)
         {
-            std::cout << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
+            EV_DETAIL << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
             setTarget(tentativeTargetName.c_str());
@@ -84,7 +84,7 @@ void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
 
             auto iter = receivedAcks.find(myId);
             if (iter != receivedAcks.end()) {
-                std::cout << "Key found. Value: " << iter->second << std::endl;
+                EV_DEBUG << "Key found. Value: " << iter->second << std::endl;
                 long lastReceivedAck = iter->second;
                 // if m->acks[MyId] > LastAckedMessage:
                 if (lastReceivedAck > LastAckedMessage) {
@@ -94,7 +94,7 @@ void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
                     // TODO
                 }
             } else {
-                std::cout << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
+                EV_DEBUG << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
             }
 
             // send $SENSOR\_MESSAGES$
@@ -102,7 +102,7 @@ void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
 
             updatePayload();
         } else {
-            std::cout << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
+            EV_DEBUG << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
         }
     }
 }
@@ -145,7 +145,7 @@ void DadcaAckProtocolSensor::updatePayload() {
     // Set Message Ranges field
     payload->setMessageRanges(jsonMap.dump().c_str());
 
-    std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
+    EV_DETAIL << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     lastPayload = *payload;
 

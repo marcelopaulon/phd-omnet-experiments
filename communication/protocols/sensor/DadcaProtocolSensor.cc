@@ -45,7 +45,7 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
     if(payload != nullptr) {
         if(payload->getMessageType() == DadcaMessageType::HEARTBEAT)
         {
-            std::cout << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
+            EV_DETAIL << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
             setTarget(tentativeTargetName.c_str());
@@ -61,7 +61,7 @@ void DadcaProtocolSensor::updatePayload() {
     payload->setMessageType(DadcaMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);
-    std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
+    EV_DETAIL << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     lastPayload = *payload;
 

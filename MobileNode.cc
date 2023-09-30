@@ -17,12 +17,12 @@ void MobileNode::initialize(){
 
     //this->myType = static_cast<mobileNodeType>(par("nodeType").intValue());
 
-    std::cout << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
+    EV_DETAIL << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
 }
 int MobileNode::processMessage(inet::Packet *msg) {
 
     // O getname � o payload
-    std::cout  << "UAV-" << internalMobNodeId << " received: " << msg->getName() << endl;
+    EV_DETAIL  << "UAV-" << internalMobNodeId << " received: " << msg->getName() << endl;
 
     return 1;
 
@@ -39,7 +39,7 @@ string MobileNode::generateNextPacketToSend(){
 
 void MobileNode::handleMessage(cMessage *msg) {
 
-    std::cout  << " MobileNode::handleMessage: " << msg << endl;
+    EV_DETAIL  << " MobileNode::handleMessage: " << msg << endl;
 
 }
 
