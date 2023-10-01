@@ -22,4 +22,5 @@ simple SimpleGroundProtocol extends CommunicationProtocolBase
     parameters:
         @class(SimpleGroundProtocol);
         @signal[dataLoad](type=long); // Declaration of dataLoad signal used to track current data load that the drone is carrying
+        @statistic[dataReceived](title="dadca data received by base"; source="dataLoad"; record=max; interpolationmode=none);
 }
