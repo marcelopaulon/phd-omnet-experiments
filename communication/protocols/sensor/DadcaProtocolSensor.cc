@@ -35,6 +35,34 @@ void DadcaProtocolSensor::initialize(int stage)
 
     if(stage == INITSTAGE_LOCAL) {
         updatePayload();
+
+        sendSelfGenPacket();
+    }
+}
+
+void DadcaProtocolSensor::handleMessage(cMessage *msg) {
+    auto message = static_cast<CommunicationCommand *>(msg);
+
+    bool handled = false;
+
+    if (message != nullptr && message->getPayloadTemplate() != nullptr && message->isSelfMessage()) {
+        auto payload = static_cast<const DadcaMessage *>(message->getPayloadTemplate());
+
+        if (payload != nullptr && payload->getMessageType() == DadcaMessageType::INT_GEN_MESSAGE) {
+            Messages += 1; // Generate a new message
+            cancelAndDelete(msg);
+
+            // Schedule again for next simulated second (INT_GEN_MESSAGE)
+            sendSelfGenPacket();
+
+            handled = true;
+
+            return;
+        }
+    }
+
+    if (!handled) {
+        CommunicationProtocolBase::handleMessage(msg);
     }
 }
 
@@ -54,10 +82,31 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
     }
 }
 
+void DadcaProtocolSensor::sendSelfGenPacket() {
+    if (everySecondControlPacket != nullptr) {
+        delete everySecondControlPacket;
+    }
+
+    everySecondControlPacket = new DadcaMessage();
+    everySecondControlPacket->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+    everySecondControlPacket->setMessageType(DadcaMessageType::INT_GEN_MESSAGE);
+    everySecondControlPacket->setSourceID(this->getParentModule()->getId());
+    everySecondControlPacket->setDestinationID(this->getParentModule()->getId());
+
+    CommunicationCommand *command = new CommunicationCommand();
+    command->setCommandType(SET_PAYLOAD);
+    command->setPayloadTemplate(everySecondControlPacket);
+    // TODO try with cMessage
+
+    scheduleAt(simTime() + 1.0, command);
+}
+
 void DadcaProtocolSensor::updatePayload() {
     DadcaMessage *payload = new DadcaMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
-
+    payload->setDataLength(Messages);
+    Messages = 0; // Flush buffer.
     payload->setMessageType(DadcaMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);

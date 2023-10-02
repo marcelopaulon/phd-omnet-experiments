@@ -148,7 +148,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                             // Exchanging imaginary data to the drone closest to the start of the mission
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
 
                                 updateAcks(payload->getMessageRanges());
                             }
@@ -222,6 +222,15 @@ void DadcaAckGroundStationProtocol::updateAcks(const char *incomingMessageRanges
         }
     }
     // END UPDATE ACKS
+
+    // Set data load according to acked data
+    int tempDataLoad = 0;
+    for (const auto& pair : acks) {
+        tempDataLoad += pair.second;
+    }
+    currentDataLoad = tempDataLoad;
+    stableDataLoad = currentDataLoad;
+    emit(dataLoadSignalID, currentDataLoad);
 }
 
 void DadcaAckGroundStationProtocol::updatePayload() {
