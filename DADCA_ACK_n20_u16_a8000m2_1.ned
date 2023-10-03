@@ -1,0 +1,136 @@
+package projeto;
+
+import inet.common.geometry.common.SimpleGeographicCoordinateSystem;
+import inet.environment.common.PhysicalEnvironment;
+import inet.environment.ground.FlatGround;
+import inet.node.inet.AdhocHost;
+import inet.visualizer.integrated.IntegratedVisualizer;
+import inet.mobility.contract.IMobility;
+import inet.mobility.static.StationaryMobility;
+import inet.networklayer.configurator.ipv4.Ipv4NetworkConfigurator;
+import inet.node.ethernet.Eth100M;
+import inet.node.inet.SensorNode;
+import inet.node.inet.StandardHost;
+import inet.node.inet.WirelessHost;
+import inet.physicallayer.apskradio.packetlevel.ApskScalarRadioMedium;
+import inet.physicallayer.ieee802154.bitlevel.Ieee802154UwbIrRadioMedium;
+import inet.physicallayer.ieee802154.packetlevel.Ieee802154NarrowbandScalarRadioMedium;
+import inet.physicallayer.ieee80211.packetlevel.Ieee80211ScalarRadioMedium;
+import inet.visualizer.integrated.IntegratedMultiVisualizer;
+import inet.visualizer.integrated.IntegratedVisualizer;
+import inet.physicallayer.contract.packetlevel.IRadioMedium;
+
+network DADCA_ACK_n20_u16_a8000m2_1
+{
+    parameters:
+		int numUAVs = default(1);
+    submodules:
+        visualizer: IntegratedVisualizer {
+            parameters:
+                @display("p=100,50");
+        }
+        coordinateSystem: SimpleGeographicCoordinateSystem {
+            parameters:
+                @display("p=100,150");
+        }
+        
+        environment: PhysicalEnvironment {
+        }
+        
+        configurator: Ipv4NetworkConfigurator {
+            @display("p=0,200");
+        }
+        radioMedium: <default("Ieee802154NarrowbandScalarRadioMedium")> like IRadioMedium {
+            @display("p=200,0");
+        }
+        quads[numUAVs]: MobileNode {
+			
+        } 
+        
+        groundStation: GroundStation {
+            @display("i=misc/sensor3");
+        }
+       
+        
+    sensors_1: MobileSensorNode {
+        @display("i=misc/sensor;p=906.19,7815.54");
+    }
+
+    sensors_2: MobileSensorNode {
+        @display("i=misc/sensor;p=1822.08,7825.50");
+    }
+
+    sensors_3: MobileSensorNode {
+        @display("i=misc/sensor;p=2265.18,7920.97");
+    }
+
+    sensors_4: MobileSensorNode {
+        @display("i=misc/sensor;p=2638.25,7837.05");
+    }
+
+    sensors_5: MobileSensorNode {
+        @display("i=misc/sensor;p=3548.17,7859.09");
+    }
+
+    sensors_6: MobileSensorNode {
+        @display("i=misc/sensor;p=4239.38,7974.86");
+    }
+
+    sensors_7: MobileSensorNode {
+        @display("i=misc/sensor;p=4862.36,7855.15");
+    }
+
+    sensors_8: MobileSensorNode {
+        @display("i=misc/sensor;p=84.65,7712.59");
+    }
+
+    sensors_9: MobileSensorNode {
+        @display("i=misc/sensor;p=458.13,7556.03");
+    }
+
+    sensors_10: MobileSensorNode {
+        @display("i=misc/sensor;p=1302.75,7592.76");
+    }
+
+    sensors_11: MobileSensorNode {
+        @display("i=misc/sensor;p=2100.52,7539.50");
+    }
+
+    sensors_12: MobileSensorNode {
+        @display("i=misc/sensor;p=3202.93,7703.65");
+    }
+
+    sensors_13: MobileSensorNode {
+        @display("i=misc/sensor;p=3814.81,7620.58");
+    }
+
+    sensors_14: MobileSensorNode {
+        @display("i=misc/sensor;p=2856.03,7446.88");
+    }
+
+    sensors_15: MobileSensorNode {
+        @display("i=misc/sensor;p=3234.19,7316.55");
+    }
+
+    sensors_16: MobileSensorNode {
+        @display("i=misc/sensor;p=4465.90,7375.89");
+    }
+
+    sensors_17: MobileSensorNode {
+        @display("i=misc/sensor;p=5196.30,7367.81");
+    }
+
+    sensors_18: MobileSensorNode {
+        @display("i=misc/sensor;p=5719.52,7450.26");
+    }
+
+    sensors_19: MobileSensorNode {
+        @display("i=misc/sensor;p=349.57,7074.52");
+    }
+
+    sensors_20: MobileSensorNode {
+        @display("i=misc/sensor;p=670.61,7223.25");
+    }
+
+}
+
