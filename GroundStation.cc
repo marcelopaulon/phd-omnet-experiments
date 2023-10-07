@@ -33,6 +33,7 @@ public:
     int numDrones = 0;
     bool splitDrones = false;
     std::vector<DroneMobility *> &instances;
+    std::string waypointFile;
 
     Coord groundStationPosition;
 
@@ -66,6 +67,9 @@ public:
             cModule *module = check_and_cast<cModule*>(obj);
             cObject *mobilityObj = module->findObject("mobility");
             DroneMobility *mobility = check_and_cast<DroneMobility*>(mobilityObj);
+
+            waypointFile = mobility->par("waypointFile").stdstringValue();
+
             instances.push_back(mobility);
 
             EV << "Drone loaded" << endl;
@@ -175,7 +179,7 @@ void GroundStation::doPostInitializationTasks() {
 
         auto coordinateSystem = getModuleFromPar<IGeographicCoordinateSystem>(mobility->par("coordinateSystemModule"), mobility, false);
 
-        std::string tempFileName = "instanceTemp.vrp";
+        std::string tempFileName = visitor.waypointFile + "-instanceTemp.vrp";
         visitor.saveTempFile(tempFileName);
 
         InstanceCVRPLIB cvrp(tempFileName, true);
@@ -201,7 +205,20 @@ void GroundStation::doPostInitializationTasks() {
             routes.clear();
             for (int k = 0; k < (int)indiv.chromR.size(); k++)
             {
-                std::string outputFileName = "paths/tempAutoRouteUav" + std::to_string(k) + ".waypoints";
+                std::string outputFileName = visitor.waypointFile;
+
+                // Find the position of "0" in visitor.waypointFile
+                size_t pos = outputFileName.find("0");
+
+                // Check if "0" was found in the string
+                if (pos != std::string::npos) {
+                    // Replace "0" with the integer k
+                    outputFileName.replace(pos, 1, std::to_string(k));
+                } else {
+                    EV_ERROR << "Missing 0 char in waypointFile. The char 0 must be present to be replaced by each route generated.";
+                    exit(-1337);
+                }
+
                 std::ofstream outputFile(outputFileName); // Open the file for writing
 
                 if (!indiv.chromR[k].empty())
