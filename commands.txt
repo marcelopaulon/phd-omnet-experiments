@@ -298,5 +298,3 @@ projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u16_a8000m2_8-DADCA" && rm -f r
 projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u16_a8000m2_8-DADCA-ACK" && rm -f results/*.vec && rm -f results/*.vci
 projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u16_a8000m2_9-DADCA" && rm -f results/*.vec && rm -f results/*.vci
 projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u16_a8000m2_9-DADCA-ACK" && rm -f results/*.vec && rm -f results/*.vci
-projeto omnetpp.ini -u Cmdenv -c "Dadca" && rm -f results/*.vec && rm -f results/*.vci
-projeto omnetpp.ini -u Cmdenv -c "DadcaAck" && rm -f results/*.vec && rm -f results/*.vci
