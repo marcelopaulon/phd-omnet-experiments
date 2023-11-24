@@ -53,83 +53,83 @@ network DADCA_ACK_n20_u2_a8000m2_1
        
         
     sensors_1: MobileSensorNode {
-        @display("i=misc/sensor;p=140.20,7878.72");
+        @display("i=misc/sensor;p=248.18,7753.82");
     }
 
     sensors_2: MobileSensorNode {
-        @display("i=misc/sensor;p=616.30,7835.27");
+        @display("i=misc/sensor;p=775.12,7988.06");
     }
 
     sensors_3: MobileSensorNode {
-        @display("i=misc/sensor;p=1267.63,7793.71");
+        @display("i=misc/sensor;p=1409.00,7759.64");
     }
 
     sensors_4: MobileSensorNode {
-        @display("i=misc/sensor;p=1671.03,7874.99");
+        @display("i=misc/sensor;p=2973.88,7801.40");
     }
 
     sensors_5: MobileSensorNode {
-        @display("i=misc/sensor;p=2164.28,7893.39");
+        @display("i=misc/sensor;p=3516.24,7931.02");
     }
 
     sensors_6: MobileSensorNode {
-        @display("i=misc/sensor;p=3317.17,7833.45");
+        @display("i=misc/sensor;p=5051.41,7877.55");
     }
 
     sensors_7: MobileSensorNode {
-        @display("i=misc/sensor;p=4164.83,7878.37");
+        @display("i=misc/sensor;p=5528.50,7866.11");
     }
 
     sensors_8: MobileSensorNode {
-        @display("i=misc/sensor;p=4713.92,7980.60");
+        @display("i=misc/sensor;p=1866.72,7617.17");
     }
 
     sensors_9: MobileSensorNode {
-        @display("i=misc/sensor;p=5689.08,7870.42");
+        @display("i=misc/sensor;p=2281.52,7740.00");
     }
 
     sensors_10: MobileSensorNode {
-        @display("i=misc/sensor;p=1014.11,7536.61");
+        @display("i=misc/sensor;p=4194.69,7646.26");
     }
 
     sensors_11: MobileSensorNode {
-        @display("i=misc/sensor;p=2560.98,7661.14");
+        @display("i=misc/sensor;p=4635.18,7602.10");
     }
 
     sensors_12: MobileSensorNode {
-        @display("i=misc/sensor;p=3067.39,7563.25");
+        @display("i=misc/sensor;p=467.84,7392.37");
     }
 
     sensors_13: MobileSensorNode {
-        @display("i=misc/sensor;p=3733.25,7612.18");
+        @display("i=misc/sensor;p=1040.65,7394.98");
     }
 
     sensors_14: MobileSensorNode {
-        @display("i=misc/sensor;p=4656.68,7630.89");
+        @display("i=misc/sensor;p=2705.26,7458.68");
     }
 
     sensors_15: MobileSensorNode {
-        @display("i=misc/sensor;p=5314.62,7699.71");
+        @display("i=misc/sensor;p=3800.06,7278.73");
     }
 
     sensors_16: MobileSensorNode {
-        @display("i=misc/sensor;p=15.78,7304.88");
+        @display("i=misc/sensor;p=5228.28,7447.44");
     }
 
     sensors_17: MobileSensorNode {
-        @display("i=misc/sensor;p=367.23,7361.82");
+        @display("i=misc/sensor;p=5828.85,7498.11");
     }
 
     sensors_18: MobileSensorNode {
-        @display("i=misc/sensor;p=1420.26,7302.58");
+        @display("i=misc/sensor;p=1370.41,7215.88");
     }
 
     sensors_19: MobileSensorNode {
-        @display("i=misc/sensor;p=1970.64,7342.66");
+        @display("i=misc/sensor;p=1710.97,7058.04");
     }
 
     sensors_20: MobileSensorNode {
-        @display("i=misc/sensor;p=4321.91,7464.13");
+        @display("i=misc/sensor;p=2639.51,7097.38");
     }
 
 }
