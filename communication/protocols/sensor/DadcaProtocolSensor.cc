@@ -34,10 +34,11 @@ void DadcaProtocolSensor::initialize(int stage)
     CommunicationProtocolBase::initialize(stage);
 
     if(stage == INITSTAGE_LOCAL) {
-        updatePayload();
+
 
         sendSelfGenPacket();
     }
+    WATCH(Messages);
 }
 
 void DadcaProtocolSensor::handleMessage(cMessage *msg) {
@@ -76,8 +77,7 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
             EV_DETAIL << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
-            setTarget(tentativeTargetName.c_str());
-            updatePayload();
+            sendMessage(tentativeTargetName.c_str());
         }
     }
 }
@@ -102,7 +102,7 @@ void DadcaProtocolSensor::sendSelfGenPacket() {
     scheduleAt(simTime() + 1.0, command);
 }
 
-void DadcaProtocolSensor::updatePayload() {
+void DadcaProtocolSensor::sendMessage(const char *target) {
     DadcaMessage *payload = new DadcaMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
     payload->setDataLength(Messages);
@@ -115,14 +115,8 @@ void DadcaProtocolSensor::updatePayload() {
     lastPayload = *payload;
 
     CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_PAYLOAD);
+    command->setCommandType(SEND_MESSAGE);
     command->setPayloadTemplate(payload);
-    sendCommand(command);
-}
-
-void DadcaProtocolSensor::setTarget(const char *target) {
-    CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_TARGET);
     command->setTarget(target);
     sendCommand(command);
 }

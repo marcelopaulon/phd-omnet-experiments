@@ -58,8 +58,7 @@ class DadcaAckProtocolSensor : public CommunicationProtocolBase
         void sendSelfGenPacket();
 
         // Updates payload that communication will send
-        virtual void updatePayload();
-        virtual void setTarget(const char *target);
+        virtual void sendMessage(const char *target);
 
         DadcaAckMessage *everySecondControlPacket = nullptr;
     public:
