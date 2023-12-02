@@ -24,6 +24,7 @@ enum DadcaMessageType
   PAIR_REQUEST = 1; 
   PAIR_CONFIRM = 2;
   BEARER = 3;
+  INT_GEN_MESSAGE = 4;
 }
 
 class DadcaMessage extends FieldsChunk
