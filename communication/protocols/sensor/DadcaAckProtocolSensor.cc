@@ -34,7 +34,6 @@ void DadcaAckProtocolSensor::initialize(int stage)
     CommunicationProtocolBase::initialize(stage);
 
     if(stage == INITSTAGE_LOCAL) {
-        updatePayload();
 
         sendSelfGenPacket();
     }
@@ -69,42 +68,42 @@ void DadcaAckProtocolSensor::handleMessage(cMessage *msg) {
 void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
     auto payload = pk->peekAtBack<DadcaAckMessage>(B(34), 1);
 
-    if(payload != nullptr) {
-        if(payload->getMessageType() == DadcaAckMessageType::UAV_PING_HEARTBEAT)
-        {
-            EV_DETAIL << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
-            tentativeTarget = payload->getSourceID();
-            tentativeTargetName = pk->getName();
-            setTarget(tentativeTargetName.c_str());
+       if(payload != nullptr) {
+           if(payload->getMessageType() == DadcaAckMessageType::UAV_PING_HEARTBEAT)
+           {
+               EV_DETAIL << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
+               tentativeTarget = payload->getSourceID();
+               tentativeTargetName = pk->getName();
 
-            nlohmann::json jsonMap = nlohmann::json::parse(payload->getAcks());
-            std::unordered_map<std::string, long> receivedAcks = jsonMap.get<std::unordered_map<std::string, long>>();
 
-            const char *myId = this->getParentModule()->getFullName();
+               nlohmann::json jsonMap = nlohmann::json::parse(payload->getAcks());
+               std::unordered_map<std::string, long> receivedAcks = jsonMap.get<std::unordered_map<std::string, long>>();
 
-            auto iter = receivedAcks.find(myId);
-            if (iter != receivedAcks.end()) {
-                EV_DEBUG << "Key found. Value: " << iter->second << std::endl;
-                long lastReceivedAck = iter->second;
-                // if m->acks[MyId] > LastAckedMessage:
-                if (lastReceivedAck > LastAckedMessage) {
-                    //   LastAckedMessage = m->acks[MyId]
-                    LastAckedMessage = lastReceivedAck;
-                    //   clear acked messages
-                    // TODO
-                }
-            } else {
-                EV_DEBUG << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
-            }
+               const char *myId = this->getParentModule()->getFullName();
 
-            // send $SENSOR\_MESSAGES$
-            //  - Messages
+               auto iter = receivedAcks.find(myId);
+               if (iter != receivedAcks.end()) {
+                   EV_DEBUG << "Key found. Value: " << iter->second << std::endl;
+                   long lastReceivedAck = iter->second;
+                   // if m->acks[MyId] > LastAckedMessage:
+                   if (lastReceivedAck > LastAckedMessage) {
+                       //   LastAckedMessage = m->acks[MyId]
+                       LastAckedMessage = lastReceivedAck;
+                       //   clear acked messages
+                       // TODO
+                   }
+               } else {
+                   EV_DEBUG << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
+               }
 
-            updatePayload();
-        } else {
-            EV_DEBUG << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
-        }
-    }
+               // send $SENSOR\_MESSAGES$
+               //  - Messages
+
+               sendMessage(tentativeTargetName.c_str());
+           } else {
+               EV_DEBUG << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
+           }
+       }
 }
 
 void DadcaAckProtocolSensor::sendSelfGenPacket() {
@@ -127,7 +126,7 @@ void DadcaAckProtocolSensor::sendSelfGenPacket() {
     scheduleAt(simTime() + 1.0, command);
 }
 
-void DadcaAckProtocolSensor::updatePayload() {
+void DadcaAckProtocolSensor::sendMessage(const char *target) {
     DadcaAckMessage *payload = new DadcaAckMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
 
@@ -150,14 +149,8 @@ void DadcaAckProtocolSensor::updatePayload() {
     lastPayload = *payload;
 
     CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_PAYLOAD);
+    command->setCommandType(SEND_MESSAGE);
     command->setPayloadTemplate(payload);
-    sendCommand(command);
-}
-
-void DadcaAckProtocolSensor::setTarget(const char *target) {
-    CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_TARGET);
     command->setTarget(target);
     sendCommand(command);
 }

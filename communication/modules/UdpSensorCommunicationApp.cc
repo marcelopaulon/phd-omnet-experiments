@@ -66,6 +66,9 @@ void UdpSensorCommunicationApp::handleMessageWhenUp(cMessage *msg) {
                 delete messagePayload;
                 break;
             }
+            case SEND_MESSAGE:
+                sendPacket(command->getPayloadTemplate(), command->getTarget());
+                break;
         }
 
         if(socket.isOpen() && targetName && payloadTemplate) {
@@ -100,6 +103,38 @@ void UdpSensorCommunicationApp::sendPacket(char *target) {
         }
     }
 }
+
+void UdpSensorCommunicationApp::sendPacket(const FieldsChunk* payload, const char *target) {
+    if(!socket.isOpen()) {
+        return;
+    }
+
+
+    /*Default package setup*/
+    Packet *packet = new Packet("DroneMessage");
+    if(dontFragment)
+        packet->addTag<FragmentationReq>()->setDontFragment(true);
+    packet->setName(this->getParentModule()->getFullName());
+
+    if(payload != nullptr) {
+        packet->insertAtBack(payload->dupShared());
+
+
+        L3Address destAddr;
+        if(target != nullptr && strlen(target)  > 0) {
+            // Else sends message to the specific target
+            L3AddressResolver().tryResolve(target, destAddr);
+        } else {
+            // No specific target means the message should go to the multicast address
+            destAddr = Ipv4Address("224.0.0.9");
+        }
+
+        emit(packetSentSignal, packet);
+        socket.sendTo(packet, destAddr, destPort);
+        numSent++;
+    }
+}
+
 
 void UdpSensorCommunicationApp::processPacket(Packet *pk) {
     // Ignore messages not in address list

@@ -22,6 +22,8 @@ enum CommunicationCommandType {
     SET_PAYLOAD=0;
     // Sets the target of the communication message (null means broadcast)
     SET_TARGET=1;
+    // Sends a one time message with the payload AND target specified
+    SEND_MESSAGE=2;
 }
 
 // Message declaration for the communication command
@@ -30,7 +32,7 @@ message CommunicationCommand {
     CommunicationCommandType commandType;
     
     // Template for the SET_PAYLOAD message type (message that the communication module should send)
-    inet::FieldsChunk *payloadTemplate;
+    inet::FieldsChunk *payloadTemplate = nullptr;
     
     // Target for the set target command
     string target;
