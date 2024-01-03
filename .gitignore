@@ -1,3 +1,9 @@
+results/
+resultsold/
+results-old/
+dadca-ack-result-process/tempres/
+dadca-ack-result-process/tempresold/
+
 instanceTemp.vrp
 instanceTemp.vrp-result
 paths/temp*.waypoints
