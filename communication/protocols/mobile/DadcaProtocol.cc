@@ -219,10 +219,33 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             case DadcaMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    EV_DETAIL << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
+                    EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
+
+                    /////
+                    // send ACK_DATA_COLLECTION ack message
+                    DadcaMessage *payload = new DadcaMessage();
+                    payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+                    // Sets the reverse flag on the payload
+                    payload->setReversed(lastStableTelemetry.isReversed());
+                    payload->setNextWaypointID(lastStableTelemetry.getNextWaypointID());
+                    payload->setLastWaypointID(lastStableTelemetry.getLastWaypointID());
+
+                    payload->setLeftNeighbours(leftNeighbours);
+                    payload->setRightNeighbours(rightNeighbours);
+
+                    payload->setSourceID(this->getParentModule()->getId());
+                    payload->setMessageType(DadcaMessageType::ACK_DATA_COLLECTION);
+
+                    CommunicationCommand *command = new CommunicationCommand();
+                    command->setCommandType(SEND_MESSAGE);
+                    command->setPayloadTemplate(payload);
+                    sendCommand(command);
+                    /////
+
                     initiateTimeout(timeoutDuration);
 
                     communicationStatus = COLLECTING;

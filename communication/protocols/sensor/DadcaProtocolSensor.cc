@@ -78,6 +78,9 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
             sendMessage(tentativeTargetName.c_str());
+        } else if (payload->getMessageType() == DadcaMessageType::ACK_DATA_COLLECTION) {
+            if (payload->getSourceID() != -1 && payload->getSourceID() == tentativeTarget)
+            Messages = 0; // Flush buffer
         }
     }
 }
@@ -106,7 +109,7 @@ void DadcaProtocolSensor::sendMessage(const char *target) {
     DadcaMessage *payload = new DadcaMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
     payload->setDataLength(Messages);
-    Messages = 0; // Flush buffer.
+    //Messages = 0; // Flush buffer.
     payload->setMessageType(DadcaMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);

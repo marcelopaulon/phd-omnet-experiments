@@ -189,7 +189,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                             // Exchanging imaginary data to the drone closest to the start of the mission - equivalent to UAV_MESSAGES behavior?
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -199,7 +199,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                                 }
                             } else {
                                 // Drone farthest away loses data
-                                currentDataLoad = 0;
+                                //currentDataLoad = 0;
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -228,7 +228,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                 if(!isTimedout() && communicationStatus == FREE) {
                     EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
                     EV_DETAIL << payload->getMessageRanges() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
 
                     updateRanges(payload->getMessageRanges());
 
@@ -251,7 +251,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
     auto mamPayload = dynamicPtrCast<const BMeshPacket>(pk->peekAtBack());
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
-            currentDataLoad++;
+            //currentDataLoad++; what?
             stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
@@ -360,6 +360,10 @@ void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
     currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
     emit(bufferLoadSignalID, currentBufferLoad);
     ///// UPDATE BUFFER STATS
+
+    //
+    currentDataLoad = currentBufferLoad;
+    emit(dataLoadSignalID, currentDataLoad);
 }
 
 void DadcaAckUAVProtocol::rendevouz() {
@@ -502,7 +506,6 @@ void DadcaAckUAVProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaAckMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
 
             EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
