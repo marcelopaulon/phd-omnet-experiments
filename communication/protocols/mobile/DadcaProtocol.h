@@ -66,6 +66,8 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         DadcaMessage lastPayload = DadcaMessage();
 
+        std::string curMessageIds = "";
+
     protected:
         virtual void initialize(int stage) override;
 

@@ -25,9 +25,27 @@
 #include "inet/applications/base/ApplicationPacket_m.h"
 #include "../../../applications/mamapp/BMeshPacket_m.h"
 
+#include <sstream>
+#include <unordered_set>
+
 namespace projeto {
 
 Define_Module(DadcaProtocol);
+
+int countDistinctIds(const std::string& input) {
+    std::unordered_set<std::string> uniqueIds;
+    std::istringstream iss(input);
+    std::string id;
+
+    while (std::getline(iss, id, ';')) {
+        // Ignore empty strings
+        if (!id.empty()) {
+            uniqueIds.insert(id);
+        }
+    }
+
+    return static_cast<int>(uniqueIds.size());
+}
 
 void DadcaProtocol::initialize(int stage)
 {
@@ -181,8 +199,9 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             // Exchanging imaginary data to the drone closest to the start of the mission
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
-
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
+                                curMessageIds += payload->getMessageIds();
+                                currentDataLoad = countDistinctIds(curMessageIds);
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -193,6 +212,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             } else {
                                 // Drone farthest away loses data
                                 currentDataLoad = 0;
+                                curMessageIds = "";
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -220,7 +240,11 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             {
                 if(!isTimedout() && communicationStatus == FREE) {
                     EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
+                    std::string tempIds = payload->getMessageIds();
+
+                    curMessageIds += tempIds;
+                    currentDataLoad = countDistinctIds(curMessageIds);
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
 
@@ -239,6 +263,8 @@ void DadcaProtocol::handlePacket(Packet *pk) {
 
                     payload->setSourceID(this->getParentModule()->getId());
                     payload->setMessageType(DadcaMessageType::ACK_DATA_COLLECTION);
+
+                    payload->setMessageIds(curMessageIds.c_str());
 
                     CommunicationCommand *command = new CommunicationCommand();
                     command->setCommandType(SEND_MESSAGE);
@@ -426,6 +452,7 @@ void DadcaProtocol::updatePayload() {
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
+        payload->setMessageIds(curMessageIds.c_str());
         command->setPayloadTemplate(payload);
         sendCommand(command);
     } else {

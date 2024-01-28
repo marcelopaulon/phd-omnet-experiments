@@ -29,13 +29,28 @@ namespace projeto {
 
 Define_Module(DadcaProtocolSensor);
 
+std::string DadcaProtocolSensor::generateUUID() {
+    const char* hex_chars = "0123456789abcdef";
+    std::string uuid;
+
+    for (int i = 0; i < 32; ++i) {
+        uuid += hex_chars[dis(gen)];
+        if (i == 7 || i == 11 || i == 15 || i == 19) {
+            uuid += '-';
+        }
+    }
+
+    return uuid;
+}
+
+DadcaProtocolSensor::DadcaProtocolSensor() {
+}
+
 void DadcaProtocolSensor::initialize(int stage)
 {
     CommunicationProtocolBase::initialize(stage);
 
     if(stage == INITSTAGE_LOCAL) {
-
-
         sendSelfGenPacket();
     }
     WATCH(Messages);
@@ -51,6 +66,8 @@ void DadcaProtocolSensor::handleMessage(cMessage *msg) {
 
         if (payload != nullptr && payload->getMessageType() == DadcaMessageType::INT_GEN_MESSAGE) {
             Messages += 1; // Generate a new message
+            curMessageIds += generateUUID() + ";";
+
             cancelAndDelete(msg);
 
             // Schedule again for next simulated second (INT_GEN_MESSAGE)
@@ -79,8 +96,10 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
             tentativeTargetName = pk->getName();
             sendMessage(tentativeTargetName.c_str());
         } else if (payload->getMessageType() == DadcaMessageType::ACK_DATA_COLLECTION) {
-            if (payload->getSourceID() != -1 && payload->getSourceID() == tentativeTarget)
-            Messages = 0; // Flush buffer
+            if (payload->getSourceID() != -1 && payload->getSourceID() == tentativeTarget) {
+                Messages = 0; // Flush buffer
+                curMessageIds = "";
+            }
         }
     }
 }
@@ -109,6 +128,7 @@ void DadcaProtocolSensor::sendMessage(const char *target) {
     DadcaMessage *payload = new DadcaMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
     payload->setDataLength(Messages);
+    payload->setMessageIds(curMessageIds.c_str());
     //Messages = 0; // Flush buffer.
     payload->setMessageType(DadcaMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());

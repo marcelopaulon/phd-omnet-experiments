@@ -21,6 +21,10 @@
 #include "../../messages/network/DadcaMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
 
+#include <random>
+#include <iomanip>
+#include <iostream>
+
 using namespace omnetpp;
 
 namespace projeto {
@@ -37,6 +41,8 @@ class DadcaProtocolSensor : public CommunicationProtocolBase
         int tentativeTarget = -1;
         // Name of the current target (for addressing purposes)
         std::string tentativeTargetName;
+
+        std::string curMessageIds = "";
 
         DadcaMessage lastPayload = DadcaMessage();
 
@@ -56,10 +62,23 @@ class DadcaProtocolSensor : public CommunicationProtocolBase
 
         virtual void sendMessage(const char *target);
 
+        static std::random_device rd;
+        static std::mt19937 gen;
+        static std::uniform_int_distribution<> dis;
+
+        std::string generateUUID();
+
         DadcaMessage *everySecondControlPacket = nullptr;
     public:
         simsignal_t dataLoadSignalID;
+        DadcaProtocolSensor();
 };
+
+// Define static members outside the class
+std::random_device DadcaProtocolSensor::rd;
+std::mt19937 DadcaProtocolSensor::gen(DadcaProtocolSensor::rd());
+std::uniform_int_distribution<> DadcaProtocolSensor::dis(0, 15);
+
 
 } //namespace
 
