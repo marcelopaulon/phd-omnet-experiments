@@ -21,6 +21,9 @@
 #include "../../messages/network/DadcaMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
 
+#include <sstream>
+#include <unordered_set>
+
 using namespace omnetpp;
 
 namespace projeto {
@@ -66,7 +69,7 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         DadcaMessage lastPayload = DadcaMessage();
 
-        std::string curMessageIds = "";
+        std::unordered_set<std::string> curMessageIds;
 
     protected:
         virtual void initialize(int stage) override;
@@ -79,6 +82,8 @@ class DadcaProtocol : public CommunicationProtocolBase
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+
+        virtual void finish() override;
     private:
         // Sends sequence of orders that defines a rendevouz point, navigates
         // to it and reverses
@@ -87,6 +92,9 @@ class DadcaProtocol : public CommunicationProtocolBase
         // Updates payload that communication will send
         virtual void updatePayload();
         virtual void setTarget(const char *target);
+
+        std::string setToStr(std::unordered_set<std::string> messageIds);
+        std::unordered_set<std::string> toSet(std::string messageIdsStr);
     public:
         simsignal_t dataLoadSignalID;
 };

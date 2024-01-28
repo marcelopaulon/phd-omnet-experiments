@@ -25,15 +25,13 @@
 #include "inet/applications/base/ApplicationPacket_m.h"
 #include "../../../applications/mamapp/BMeshPacket_m.h"
 
-#include <sstream>
-#include <unordered_set>
-
 namespace projeto {
 
 Define_Module(DadcaProtocol);
 
-int countDistinctIds(const std::string& input) {
-    std::unordered_set<std::string> uniqueIds;
+/*
+ *
+ * std::unordered_set<std::string> uniqueIds;
     std::istringstream iss(input);
     std::string id;
 
@@ -45,7 +43,7 @@ int countDistinctIds(const std::string& input) {
     }
 
     return static_cast<int>(uniqueIds.size());
-}
+ */
 
 void DadcaProtocol::initialize(int stage)
 {
@@ -68,6 +66,11 @@ void DadcaProtocol::initialize(int stage)
         WATCH(lastTarget);
         WATCH(currentDataLoad);
     }
+}
+
+void DadcaProtocol::finish() {
+    currentDataLoad = curMessageIds.size();
+    CommunicationProtocolBase::finish();
 }
 
 void DadcaProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
@@ -200,8 +203,11 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
                                 //currentDataLoad = currentDataLoad + payload->getDataLength();
-                                curMessageIds += payload->getMessageIds();
-                                currentDataLoad = countDistinctIds(curMessageIds);
+
+                                auto setTemp = toSet(payload->getMessageIds());
+                                curMessageIds.insert(setTemp.begin(), setTemp.end());
+
+                                currentDataLoad = curMessageIds.size();
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -212,7 +218,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             } else {
                                 // Drone farthest away loses data
                                 currentDataLoad = 0;
-                                curMessageIds = "";
+                                curMessageIds.clear();
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -243,8 +249,11 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                     //currentDataLoad = currentDataLoad + payload->getDataLength();
                     std::string tempIds = payload->getMessageIds();
 
-                    curMessageIds += tempIds;
-                    currentDataLoad = countDistinctIds(curMessageIds);
+                    auto setTemp = toSet(tempIds);
+                    curMessageIds.insert(setTemp.begin(), setTemp.end());
+
+                    currentDataLoad = curMessageIds.size();
+
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
 
@@ -264,7 +273,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                     payload->setSourceID(this->getParentModule()->getId());
                     payload->setMessageType(DadcaMessageType::ACK_DATA_COLLECTION);
 
-                    payload->setMessageIds(curMessageIds.c_str());
+                    payload->setMessageIds(setToStr(curMessageIds).c_str());
 
                     CommunicationCommand *command = new CommunicationCommand();
                     command->setCommandType(SEND_MESSAGE);
@@ -290,6 +299,34 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
+}
+
+std::string DadcaProtocol::setToStr(std::unordered_set<std::string> messageIds) {
+    // Convert the set of strings to a single string with IDs separated by ';'
+    std::ostringstream oss;
+    for (const auto& messageId : messageIds) {
+        if (!oss.str().empty()) {
+            oss << ';';
+        }
+        oss << messageId;
+    }
+    return oss.str();
+}
+
+std::unordered_set<std::string> DadcaProtocol::toSet(std::string messageIdsStr) {
+    // Convert the string of IDs separated by ';' to a set of strings
+    std::unordered_set<std::string> messageIdsSet;
+    std::istringstream iss(messageIdsStr);
+    std::string id;
+
+    while (std::getline(iss, id, ';')) {
+        // Ignore empty strings
+        if (!id.empty()) {
+            messageIdsSet.insert(id);
+        }
+    }
+
+    return messageIdsSet;
 }
 
 void DadcaProtocol::rendevouz() {
@@ -452,7 +489,7 @@ void DadcaProtocol::updatePayload() {
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
-        payload->setMessageIds(curMessageIds.c_str());
+        payload->setMessageIds(setToStr(curMessageIds).c_str());
         command->setPayloadTemplate(payload);
         sendCommand(command);
     } else {
