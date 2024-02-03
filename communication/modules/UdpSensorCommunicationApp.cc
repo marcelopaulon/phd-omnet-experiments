@@ -68,6 +68,7 @@ void UdpSensorCommunicationApp::handleMessageWhenUp(cMessage *msg) {
             }
             case SEND_MESSAGE:
                 sendPacket(command->getPayloadTemplate(), command->getTarget());
+                delete command->getPayloadTemplate();
                 break;
         }
 
