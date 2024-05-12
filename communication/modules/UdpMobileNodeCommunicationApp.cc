@@ -72,6 +72,7 @@ void UdpMobileNodeCommunicationApp::handleMessageWhenUp(cMessage *msg) {
             }
             case SEND_MESSAGE:
                 sendPacket(command->getPayloadTemplate(), command->getTarget());
+                delete command->getPayloadTemplate();
                 break;
         }
         if(socket.isOpen()) {
