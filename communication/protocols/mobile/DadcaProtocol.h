@@ -68,6 +68,12 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         std::string curMessageIds = "";
 
+        bool isCurNodeGroundsStation = false;
+
+        int countDistinctIds(const std::string& input, bool forced);
+
+        simtime_t lastTime;
+
     protected:
         virtual void initialize(int stage) override;
 
@@ -79,6 +85,8 @@ class DadcaProtocol : public CommunicationProtocolBase
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+
+        virtual void finish() override;
     private:
         // Sends sequence of orders that defines a rendevouz point, navigates
         // to it and reverses

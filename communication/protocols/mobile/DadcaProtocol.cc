@@ -32,7 +32,21 @@ namespace projeto {
 
 Define_Module(DadcaProtocol);
 
-int countDistinctIds(const std::string& input) {
+void DadcaProtocol::finish() {
+    currentDataLoad = countDistinctIds(curMessageIds, true);
+    CommunicationProtocolBase::finish();
+}
+
+int DadcaProtocol::countDistinctIds(const std::string& input, bool forced) {
+    simtime_t currentTime = simTime();
+
+    // Check if close to 1 hour has passed or forced mode
+    if (currentTime - lastTime < 3599.0 && !forced) {
+        return -1;
+    }
+
+    lastTime = currentTime;
+
     std::unordered_set<std::string> uniqueIds;
     std::istringstream iss(input);
     std::string id;
@@ -67,6 +81,10 @@ void DadcaProtocol::initialize(int stage)
         WATCH(tentativeTarget);
         WATCH(lastTarget);
         WATCH(currentDataLoad);
+
+        if (strcmp(this->getParentModule()->getName(), "groundStation") == 0) {
+            isCurNodeGroundsStation = true;
+        }
     }
 }
 
@@ -201,7 +219,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                                 // Drone closest to the start gets the data
                                 //currentDataLoad = currentDataLoad + payload->getDataLength();
                                 curMessageIds += payload->getMessageIds();
-                                currentDataLoad = countDistinctIds(curMessageIds);
+                                currentDataLoad = countDistinctIds(curMessageIds, false);
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -244,7 +262,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                     std::string tempIds = payload->getMessageIds();
 
                     curMessageIds += tempIds;
-                    currentDataLoad = countDistinctIds(curMessageIds);
+                    currentDataLoad = countDistinctIds(curMessageIds, false);
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
 
@@ -264,7 +282,9 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                     payload->setSourceID(this->getParentModule()->getId());
                     payload->setMessageType(DadcaMessageType::ACK_DATA_COLLECTION);
 
-                    payload->setMessageIds(curMessageIds.c_str());
+                    if (!isCurNodeGroundsStation) {
+                        payload->setMessageIds(curMessageIds.c_str());
+                    }
 
                     CommunicationCommand *command = new CommunicationCommand();
                     command->setCommandType(SEND_MESSAGE);
@@ -452,7 +472,11 @@ void DadcaProtocol::updatePayload() {
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
-        payload->setMessageIds(curMessageIds.c_str());
+
+        if (!isCurNodeGroundsStation) {
+            payload->setMessageIds(curMessageIds.c_str());
+        }
+
         command->setPayloadTemplate(payload);
         sendCommand(command);
     } else {
