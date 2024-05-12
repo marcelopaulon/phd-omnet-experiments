@@ -1,2 +1,0 @@
-projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u4_a8000m2_0-DADCA" && rm -f results/*.vec && rm -f results/*.vci
-projeto omnetpp.ini -u Cmdenv -c "DADCA_ACK_n100_u4_a8000m2_0-DADCA-ACK" && rm -f results/*.vec && rm -f results/*.vci
