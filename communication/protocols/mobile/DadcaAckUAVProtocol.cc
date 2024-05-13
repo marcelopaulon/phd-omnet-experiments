@@ -25,6 +25,9 @@
 #include "inet/applications/base/ApplicationPacket_m.h"
 #include "../../../applications/mamapp/BMeshPacket_m.h"
 
+#include <inet/mobility/static/StationaryMobility.h>
+#include "../../../mobility/DroneMobility.h"
+
 namespace projeto {
 
 Define_Module(DadcaAckUAVProtocol);
@@ -32,6 +35,9 @@ Define_Module(DadcaAckUAVProtocol);
 void DadcaAckUAVProtocol::initialize(int stage)
 {
     CommunicationProtocolBase::initialize(stage);
+
+    record1sStatisticsEvent = new cMessage("record1sStatisticsEvent");
+    scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the first event after 1 second
 
     if(stage == INITSTAGE_LOCAL) {
         timeoutDuration = par("timeoutDuration");
@@ -55,6 +61,64 @@ void DadcaAckUAVProtocol::initialize(int stage)
         WATCH(currentDataLoad);
         WATCH(currentBufferLoad);
     }
+}
+
+void DadcaAckUAVProtocol::handleMessage(cMessage *msg)
+{
+    if (msg == record1sStatisticsEvent)
+    {
+        record1sStatistics();
+        scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the next event after 1 second
+    }
+    else
+    {
+        CommunicationProtocolBase::handleMessage(msg);
+    }
+}
+
+class FindGSPositionVisitor : public cVisitor {
+public:
+    FindGSPositionVisitor() {
+
+    }
+
+    Coord groundStationPosition;
+
+    void visit(cObject *obj) override {
+        if (strcmp(obj->getName(), "groundStation") == 0) {
+            cModule *module = check_and_cast<cModule*>(obj);
+            cObject *mobilityObj = module->findObject("mobility");
+            StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
+            groundStationPosition = mobility->getCurrentPosition(); // .x and .y --> coords
+        }
+    }
+};
+
+void DadcaAckUAVProtocol::record1sStatistics()
+{
+    simtime_t now = simTime();
+
+    bufferSizeVector.recordWithTimestamp(now, currentBufferLoad);
+
+    if (baseStationX == -1 && baseStationY == -1) {
+        // Find ground station
+        cModule *topModule = getModuleByPath("<root>");  // Get the top-level module
+
+        FindGSPositionVisitor visitor;
+        topModule->forEachChild(&visitor);
+
+        baseStationX = visitor.groundStationPosition.x;
+        baseStationY = visitor.groundStationPosition.y;
+    }
+
+    cObject *mobilityObj = this->getParentModule()->findObject("mobility");
+    DroneMobility *mobility = check_and_cast<DroneMobility*>(mobilityObj);
+
+    Coord curPosition = mobility->getCurrentPosition();
+    double xDelta = baseStationX - curPosition.x;
+    double yDelta = baseStationY - curPosition.y;
+    double distanceToBase = sqrt(xDelta*xDelta + yDelta*yDelta);
+    baseDistanceVector.recordWithTimestamp(now, distanceToBase);
 }
 
 void DadcaAckUAVProtocol::handleTelemetry(projeto::Telemetry *telemetry) {

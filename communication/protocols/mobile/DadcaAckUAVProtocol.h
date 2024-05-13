@@ -78,6 +78,8 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         std::unordered_map<std::string, long> messages; //Map<SensorId, Messages> messages;
         std::unordered_map<std::string, std::pair<long, long>> messageRanges; //Map<SensorId, Range> messageRanges;
 
+        double baseStationX = -1;
+        double baseStationY = -1;
     protected:
         virtual void initialize(int stage) override;
 
@@ -85,10 +87,12 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override;
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
+        virtual void handleMessage(cMessage *msg) override;
         // Checks if timeout has finished and resets parameters if it has
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+        void record1sStatistics();
     private:
         virtual void updateAcks(const char *incomingAcks);
         virtual void updateRanges(const char *incomingRanges);
@@ -100,6 +104,10 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         // Updates payload that communication will send
         virtual void updatePayload();
         virtual void setTarget(const char *target);
+
+        cMessage *record1sStatisticsEvent;
+        cOutVector baseDistanceVector;
+        cOutVector bufferSizeVector;
     public:
         simsignal_t dataLoadSignalID;
         simsignal_t bufferLoadSignalID;
