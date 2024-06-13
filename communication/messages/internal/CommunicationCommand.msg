@@ -24,6 +24,9 @@ enum CommunicationCommandType {
     SET_TARGET=1;
     // Sends a one time message with the payload AND target specified
     SEND_MESSAGE=2;
+    FAIL_COMMS=3;
+    FAIL_STORAGE=4;
+    FAIL_END=5;
 }
 
 // Message declaration for the communication command

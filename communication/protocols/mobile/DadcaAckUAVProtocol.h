@@ -80,6 +80,9 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 
         double baseStationX = -1;
         double baseStationY = -1;
+
+        bool failedComms = false;
+        bool failedStorage = false;
     protected:
         virtual void initialize(int stage) override;
 

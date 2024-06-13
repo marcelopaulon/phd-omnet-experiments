@@ -70,6 +70,11 @@ void UdpSensorCommunicationApp::handleMessageWhenUp(cMessage *msg) {
                 sendPacket(command->getPayloadTemplate(), command->getTarget());
                 delete command->getPayloadTemplate();
                 break;
+            case FAIL_COMMS:
+            case FAIL_STORAGE:
+            case FAIL_END:
+            default:
+                break;
         }
 
         if(socket.isOpen() && targetName && payloadTemplate) {

@@ -52,6 +52,8 @@ void UdpMobileNodeCommunicationApp::handleMessageWhenUp(cMessage *msg) {
     CommunicationCommand *command = dynamic_cast<CommunicationCommand *>(msg);
 
     if(command != nullptr) {
+        Packet *failPacket = nullptr;
+
         switch(command->getCommandType()) {
             case SET_TARGET:
             {
@@ -74,9 +76,31 @@ void UdpMobileNodeCommunicationApp::handleMessageWhenUp(cMessage *msg) {
                 sendPacket(command->getPayloadTemplate(), command->getTarget());
                 delete command->getPayloadTemplate();
                 break;
+            case FAIL_COMMS:
+                failPacket = new Packet("FAIL_COMMS");
+                break;
+            case FAIL_STORAGE:
+                failPacket = new Packet("FAIL_STORAGE");
+                break;
+            case FAIL_END:
+                failPacket = new Packet("FAIL_END");
+                break;
+            default:
+                break;
         }
-        if(socket.isOpen()) {
+        if(socket.isOpen() && failPacket == nullptr) {
             sendPacket();
+        } else if (socket.isOpen() && failPacket != nullptr) {
+            L3Address destAddr;
+            if(targetName != nullptr && strlen(targetName)  > 0) {
+                // Else sends message to the specific target
+                L3AddressResolver().tryResolve(targetName, destAddr);
+            } else {
+                // No specific target means the message should go to the multicast address
+                destAddr = Ipv4Address("224.0.0.9");
+            }
+
+            socket.sendTo(failPacket, destAddr, destPort);
         }
         cancelAndDelete(msg);
     }

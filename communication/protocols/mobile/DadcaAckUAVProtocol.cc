@@ -36,6 +36,9 @@ void DadcaAckUAVProtocol::initialize(int stage)
 {
     CommunicationProtocolBase::initialize(stage);
 
+    bufferSizeVector.setName("bufferSizeVector");
+    baseDistanceVector.setName("baseDistanceVector");
+
     record1sStatisticsEvent = new cMessage("record1sStatisticsEvent");
     scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the first event after 1 second
 
@@ -65,13 +68,33 @@ void DadcaAckUAVProtocol::initialize(int stage)
 
 void DadcaAckUAVProtocol::handleMessage(cMessage *msg)
 {
-    if (msg == record1sStatisticsEvent)
-    {
+    CommunicationCommand *command = dynamic_cast<CommunicationCommand *>(msg);
+
+    if (command != nullptr) {
+        switch (command->getCommandType()) {
+        case FAIL_COMMS:
+            failedComms = true;
+            break;
+        case FAIL_STORAGE:
+            failedStorage = true;
+            currentDataLoad = 0;
+            currentBufferLoad = 0;
+            acks.clear();
+            messages.clear();
+            messageRanges.clear();
+            stableDataLoad = 0;
+            break;
+        case FAIL_END:
+            failedComms = false;
+            failedStorage = false;
+            break;
+        default:
+            break;
+        }
+    } else if (msg == record1sStatisticsEvent) {
         record1sStatistics();
         scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the next event after 1 second
-    }
-    else
-    {
+    } else {
         CommunicationProtocolBase::handleMessage(msg);
     }
 }
@@ -158,8 +181,11 @@ void DadcaAckUAVProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
 }
 
 void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
-    auto payload = dynamicPtrCast<const DadcaAckMessage>(pk->peekAtBack());
+    if (failedComms) {
+        return;
+    }
 
+    auto payload = dynamicPtrCast<const DadcaAckMessage>(pk->peekAtBack());
 
     if(payload != nullptr) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;

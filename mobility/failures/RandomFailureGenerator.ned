@@ -31,4 +31,10 @@ simple RandomFailureGenerator extends FailureGeneratorBase
        	double failureChance;  
        	// Duration of a failure, normal operation will resume afterwards
        	double failureDuration @unit(s) = default(15s);
+       	// Movement failures
+       	bool movementFailures = default(false);
+       	// Communication failures
+       	bool communicationFailures = default(true);
+       	// Data storage failures
+       	bool storageFailures = default(true);
 }

@@ -124,9 +124,39 @@ void DadcaProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
     updatePayload();
 }
 
-void DadcaProtocol::handlePacket(Packet *pk) {
-    auto payload = dynamicPtrCast<const DadcaMessage>(pk->peekAtBack());
+void DadcaProtocol::handleMessage(cMessage *msg)
+{
+    CommunicationCommand *command = dynamic_cast<CommunicationCommand *>(msg);
 
+    if(command != nullptr) {
+        switch (command->getCommandType()) {
+        case FAIL_COMMS:
+            failedComms = true;
+            break;
+        case FAIL_STORAGE:
+            failedStorage = true;
+            currentDataLoad = 0;
+            curMessageIds = "";
+            stableDataLoad = 0;
+            break;
+        case FAIL_END:
+            failedComms = false;
+            failedStorage = false;
+            break;
+        default:
+            break;
+        }
+    } else {
+        CommunicationProtocolBase::handleMessage(msg);
+    }
+}
+
+void DadcaProtocol::handlePacket(Packet *pk) {
+    if (failedComms) {
+        return;
+    }
+
+    auto payload = dynamicPtrCast<const DadcaMessage>(pk->peekAtBack());
 
     if(payload != nullptr) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;
@@ -300,6 +330,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             }
         }
         updatePayload();
+        return;
     }
 
     auto mamPayload = dynamicPtrCast<const BMeshPacket>(pk->peekAtBack());

@@ -74,6 +74,8 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         simtime_t lastTime;
 
+        bool failedComms = false;
+        bool failedStorage = false;
     protected:
         virtual void initialize(int stage) override;
 
@@ -81,6 +83,7 @@ class DadcaProtocol : public CommunicationProtocolBase
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override;
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
+        virtual void handleMessage(cMessage *msg) override;
         // Checks if timeout has finished and resets parameters if it has
         virtual bool isTimedout() override;
         // Resets parameters
