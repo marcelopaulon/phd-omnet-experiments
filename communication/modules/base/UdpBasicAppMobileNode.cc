@@ -176,7 +176,8 @@ void UdpBasicAppMobileNode::processStart()
 void UdpBasicAppMobileNode::processSend()
 {
     sendPacket();
-    simtime_t d = simTime() + par("sendInterval");
+    simtime_t randomDelay = uniform(-0.002, 0.002);
+    simtime_t d = simTime() + par("sendInterval") + randomDelay;
     int time = (d - simTime()).inUnit(SimTimeUnit::SIMTIME_MS);
     if (stopTime < SIMTIME_ZERO || d < stopTime) {
         selfMsg->setKind(SEND);
