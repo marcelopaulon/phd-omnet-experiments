@@ -500,6 +500,7 @@ void DadcaProtocol::updatePayload() {
             payload->getDestinationID() != lastPayload.getDestinationID() ||
             payload->getNextWaypointID() != lastPayload.getNextWaypointID() ||
             payload->getLastWaypointID() != lastPayload.getLastWaypointID() ||
+            payload->getDataLength() != lastPayload.getDataLength() ||
             payload->getReversed() != lastPayload.getReversed()) {
         lastPayload = *payload;
 
