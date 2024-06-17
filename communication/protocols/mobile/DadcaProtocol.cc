@@ -34,15 +34,16 @@ Define_Module(DadcaProtocol);
 
 void DadcaProtocol::finish() {
     currentDataLoad = countDistinctIds(curMessageIds, true);
+    emit(dataLoadSignalID, currentDataLoad);
     CommunicationProtocolBase::finish();
 }
 
 int DadcaProtocol::countDistinctIds(const std::string& input, bool forced) {
     simtime_t currentTime = simTime();
 
-    // Check if close to 1 hour has passed or forced mode
-    if (currentTime - lastTime < 3599.0 && !forced) {
-        return -1;
+    // Check if close to 1 second has passed or forced mode
+    if (currentTime - lastTime < 1.0 && !forced) {
+        return currentDataLoad;
     }
 
     lastTime = currentTime;
@@ -137,7 +138,6 @@ void DadcaProtocol::handleMessage(cMessage *msg)
             failedStorage = true;
             currentDataLoad = 0;
             curMessageIds = "";
-            stableDataLoad = 0;
             break;
         case FAIL_END:
             failedComms = false;
@@ -293,7 +293,6 @@ void DadcaProtocol::handlePacket(Packet *pk) {
 
                     curMessageIds += tempIds;
                     currentDataLoad = countDistinctIds(curMessageIds, false);
-                    stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
 
                     /////
@@ -337,7 +336,6 @@ void DadcaProtocol::handlePacket(Packet *pk) {
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
             currentDataLoad++;
-            stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
@@ -483,7 +481,11 @@ void DadcaProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
+
+            currentDataLoad = countDistinctIds(curMessageIds, true);
+            emit(dataLoadSignalID, currentDataLoad);
+
+            payload->setDataLength(currentDataLoad);
 
             EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
@@ -545,7 +547,6 @@ void DadcaProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }

@@ -59,8 +59,6 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
 
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();
@@ -81,9 +79,12 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+
+        virtual void finish() override;
     private:
 
         void updateAcks(const char *incomingMessageRanges);
+        void ackRefresh();
 
         // Updates payload that communication will send
         virtual void updatePayload();

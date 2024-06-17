@@ -82,7 +82,6 @@ void DadcaAckUAVProtocol::handleMessage(cMessage *msg)
             acks.clear();
             messages.clear();
             messageRanges.clear();
-            stableDataLoad = 0;
             break;
         case FAIL_END:
             failedComms = false;
@@ -322,7 +321,6 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                     updateRanges(payload->getMessageRanges());
 
-                    stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
                     initiateTimeout(timeoutDuration);
 
@@ -342,7 +340,6 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
             //currentDataLoad++; what?
-            stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
@@ -666,7 +663,6 @@ void DadcaAckUAVProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }

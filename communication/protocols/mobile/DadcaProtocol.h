@@ -57,8 +57,6 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
 
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();

@@ -66,7 +66,7 @@ void DadcaProtocolSensor::handleMessage(cMessage *msg) {
 
         if (payload != nullptr && payload->getMessageType() == DadcaMessageType::INT_GEN_MESSAGE) {
             Messages += 1; // Generate a new message
-            curMessageIds += generateUUID() + ";";
+            curMessageIds += "n" + std::to_string(this->getId()) + "-" + generateUUID() + ";";
 
             cancelAndDelete(msg);
 

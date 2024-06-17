@@ -64,9 +64,6 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         // Current imaginary buffer load
         int currentBufferLoad=0;
 
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
-
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();
         Telemetry lastStableTelemetry = Telemetry();

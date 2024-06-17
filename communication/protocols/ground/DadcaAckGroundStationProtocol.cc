@@ -52,6 +52,11 @@ void DadcaAckGroundStationProtocol::initialize(int stage)
     }
 }
 
+void DadcaAckGroundStationProtocol::finish() {
+    ackRefresh();
+    CommunicationProtocolBase::finish();
+}
+
 void DadcaAckGroundStationProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
     // Starts a timeout right after the drone has completed a command (Rendevouz)
     if(currentTelemetry.getCurrentCommand() != -1 && telemetry->getCurrentCommand() == -1) {
@@ -154,7 +159,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                             }
 
                             // Updating data load
-                            emit(dataLoadSignalID, currentDataLoad);
+                            ackRefresh();
                             communicationStatus = PAIRED_FINISHED;
 
                         }
@@ -166,12 +171,9 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
             {
                 if(!isTimedout() && communicationStatus == FREE) {
                     EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
 
                     updateAcks(payload->getMessageRanges());
-
-                    stableDataLoad = currentDataLoad;
-                    emit(dataLoadSignalID, currentDataLoad);
                     initiateTimeout(timeoutDuration);
 
                     communicationStatus = COLLECTING;
@@ -194,7 +196,6 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
             currentDataLoad++;
-            stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
@@ -223,13 +224,16 @@ void DadcaAckGroundStationProtocol::updateAcks(const char *incomingMessageRanges
     }
     // END UPDATE ACKS
 
+    ackRefresh();
+}
+
+void DadcaAckGroundStationProtocol::ackRefresh() {
     // Set data load according to acked data
     int tempDataLoad = 0;
     for (const auto& pair : acks) {
         tempDataLoad += pair.second;
     }
     currentDataLoad = tempDataLoad;
-    stableDataLoad = currentDataLoad;
     emit(dataLoadSignalID, currentDataLoad);
 }
 
@@ -270,7 +274,7 @@ void DadcaAckGroundStationProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaAckMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
+            payload->setDataLength(currentDataLoad);
 
             EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
@@ -332,7 +336,6 @@ void DadcaAckGroundStationProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }
