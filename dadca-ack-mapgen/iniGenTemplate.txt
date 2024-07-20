@@ -1,0 +1,11 @@
+[Config ##{NETWORK_NAME}##-DADCA]
+description = Simulation-DADCA
+network = ##{NETWORK_NAME}##
+extends = Dadca
+##{S1-END}###
+
+[Config ##{NETWORK_NAME}##-DADCA-ACK]
+description = Simulation-DADCA-ACK
+network = ##{NETWORK_NAME}##
+extends = DadcaAck
+##{S2-END}###

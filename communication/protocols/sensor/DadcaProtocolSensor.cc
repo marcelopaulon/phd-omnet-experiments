@@ -29,12 +29,58 @@ namespace projeto {
 
 Define_Module(DadcaProtocolSensor);
 
+std::string DadcaProtocolSensor::generateUUID() {
+    const char* hex_chars = "0123456789abcdef";
+    std::string uuid;
+
+    for (int i = 0; i < 32; ++i) {
+        uuid += hex_chars[dis(gen)];
+        if (i == 7 || i == 11 || i == 15 || i == 19) {
+            uuid += '-';
+        }
+    }
+
+    return uuid;
+}
+
+DadcaProtocolSensor::DadcaProtocolSensor() {
+}
+
 void DadcaProtocolSensor::initialize(int stage)
 {
     CommunicationProtocolBase::initialize(stage);
 
     if(stage == INITSTAGE_LOCAL) {
-        updatePayload();
+        sendSelfGenPacket();
+    }
+    WATCH(Messages);
+}
+
+void DadcaProtocolSensor::handleMessage(cMessage *msg) {
+    auto message = static_cast<CommunicationCommand *>(msg);
+
+    bool handled = false;
+
+    if (message != nullptr && message->getPayloadTemplate() != nullptr && message->isSelfMessage()) {
+        auto payload = static_cast<const DadcaMessage *>(message->getPayloadTemplate());
+
+        if (payload != nullptr && payload->getMessageType() == DadcaMessageType::INT_GEN_MESSAGE) {
+            Messages += 1; // Generate a new message
+            curMessageIds += "n" + std::to_string(this->getId()) + "-" + generateUUID() + ";";
+
+            cancelAndDelete(msg);
+
+            // Schedule again for next simulated second (INT_GEN_MESSAGE)
+            sendSelfGenPacket();
+
+            handled = true;
+
+            return;
+        }
+    }
+
+    if (!handled) {
+        CommunicationProtocolBase::handleMessage(msg);
     }
 }
 
@@ -45,35 +91,55 @@ void DadcaProtocolSensor::handlePacket(Packet *pk) {
     if(payload != nullptr) {
         if(payload->getMessageType() == DadcaMessageType::HEARTBEAT)
         {
-            std::cout << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
+            EV_DETAIL << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
-            setTarget(tentativeTargetName.c_str());
-            updatePayload();
+            sendMessage(tentativeTargetName.c_str());
+        } else if (payload->getMessageType() == DadcaMessageType::ACK_DATA_COLLECTION) {
+            if (payload->getSourceID() != -1 && payload->getSourceID() == tentativeTarget) {
+                Messages = 0; // Flush buffer
+                curMessageIds = "";
+            }
         }
     }
 }
 
-void DadcaProtocolSensor::updatePayload() {
+void DadcaProtocolSensor::sendSelfGenPacket() {
+    if (everySecondControlPacket != nullptr) {
+        delete everySecondControlPacket;
+    }
+
+    everySecondControlPacket = new DadcaMessage();
+    everySecondControlPacket->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+    everySecondControlPacket->setMessageType(DadcaMessageType::INT_GEN_MESSAGE);
+    everySecondControlPacket->setSourceID(this->getParentModule()->getId());
+    everySecondControlPacket->setDestinationID(this->getParentModule()->getId());
+
+    CommunicationCommand *command = new CommunicationCommand();
+    command->setCommandType(SET_PAYLOAD);
+    command->setPayloadTemplate(everySecondControlPacket);
+    // TODO try with cMessage
+
+    scheduleAt(simTime() + 1.0, command);
+}
+
+void DadcaProtocolSensor::sendMessage(const char *target) {
     DadcaMessage *payload = new DadcaMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
-
+    payload->setDataLength(Messages);
+    payload->setMessageIds(curMessageIds.c_str());
+    //Messages = 0; // Flush buffer.
     payload->setMessageType(DadcaMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);
-    std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
+    EV_DETAIL << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     lastPayload = *payload;
 
     CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_PAYLOAD);
+    command->setCommandType(SEND_MESSAGE);
     command->setPayloadTemplate(payload);
-    sendCommand(command);
-}
-
-void DadcaProtocolSensor::setTarget(const char *target) {
-    CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_TARGET);
     command->setTarget(target);
     sendCommand(command);
 }

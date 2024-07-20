@@ -204,7 +204,7 @@ void UdpBasicAppMobileSensorNode::processStop()
 
 void UdpBasicAppMobileSensorNode::handleMessageWhenUp(cMessage *msg)
 {
-    //std::cout  << " UdpBasicAppMobileSensorNode::handleMessageWhenUp: " << msg->getClassName() << endl;
+    //EV_TRACE  << " UdpBasicAppMobileSensorNode::handleMessageWhenUp: " << msg->getClassName() << endl;
 
     if (msg->isSelfMessage()) {
         ASSERT(msg == selfMsg);
@@ -263,8 +263,8 @@ void UdpBasicAppMobileSensorNode::refreshDisplay() const
 
 void UdpBasicAppMobileSensorNode::processPacket(Packet *pk)
 {
-    std::cout  << " UdpBasicAppMobileSensorNode::processPacket " << pk->getClassName() << endl;
-    std::cout  << " UdpBasicAppMobileSensorNode::processPacket " << UdpSocket::getReceivedPacketInfo(pk) << endl;
+    EV_TRACE  << " UdpBasicAppMobileSensorNode::processPacket " << pk->getClassName() << endl;
+    EV_TRACE  << " UdpBasicAppMobileSensorNode::processPacket " << UdpSocket::getReceivedPacketInfo(pk) << endl;
 
     emit(packetReceivedSignal, pk);
     EV_INFO << "Received packet: " << UdpSocket::getReceivedPacketInfo(pk) << endl;

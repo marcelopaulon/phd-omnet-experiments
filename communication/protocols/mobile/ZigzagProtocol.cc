@@ -88,7 +88,7 @@ void ZigzagProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
+                        EV_DETAIL << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
                     }
                 }
                 break;
@@ -106,11 +106,11 @@ void ZigzagProtocol::handlePacket(Packet *pk) {
 
                 if(isTimedout()) {
                     if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
+                        EV_DETAIL << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
                         communicationStatus = PAIRED;
                     }
                 } else {
-                    std::cout << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
                     tentativeTarget = payload->getSourceID();
                     tentativeTargetName = pk->getName();
                     initiateTimeout(timeoutDuration);
@@ -123,7 +123,7 @@ void ZigzagProtocol::handlePacket(Packet *pk) {
             {
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
                         // If both drones are travelling in the same direction, only the one with the biggest ID inverts
                         if(lastStableTelemetry.isReversed() != payload->getReversed() || this->getParentModule()->getId() > payload->getSourceID()) {
@@ -148,7 +148,7 @@ void ZigzagProtocol::handlePacket(Packet *pk) {
             case ZigzagMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
+                    EV_DETAIL << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
                     currentDataLoad = currentDataLoad + payload->getDataLength();
                     stableDataLoad = currentDataLoad;
                     emit(dataLoadSignalID, currentDataLoad);
@@ -187,14 +187,14 @@ void ZigzagProtocol::updatePayload() {
         case FREE:
         {
             payload->setMessageType(ZigzagMessageType::HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to heartbeat" << endl;
+            EV_DETAIL << payload->getSourceID() << " set to heartbeat" << endl;
             break;
         }
         case REQUESTING:
         {
             payload->setMessageType(ZigzagMessageType::PAIR_REQUEST);
             payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
             break;
         }
         case PAIRED:
@@ -204,7 +204,7 @@ void ZigzagProtocol::updatePayload() {
             payload->setDestinationID(tentativeTarget);
             payload->setDataLength(stableDataLoad);
 
-            std::cout << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
         }
         case COLLECTING:

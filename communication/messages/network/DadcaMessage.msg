@@ -24,6 +24,8 @@ enum DadcaMessageType
   PAIR_REQUEST = 1; 
   PAIR_CONFIRM = 2;
   BEARER = 3;
+  INT_GEN_MESSAGE = 4;
+  ACK_DATA_COLLECTION = 5;
 }
 
 class DadcaMessage extends FieldsChunk
@@ -38,4 +40,5 @@ class DadcaMessage extends FieldsChunk
   int rightNeighbours = 0; // Neighbours to the right of the drone
   bool reversed = false; // Reverse flag which indicates the current direction the drone is travelling in
   DadcaMessageType messageType = HEARTBEAT; // Type of message
+  string messageIds = "";
 }

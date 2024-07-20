@@ -34,46 +34,123 @@ void DadcaAckProtocolSensor::initialize(int stage)
     CommunicationProtocolBase::initialize(stage);
 
     if(stage == INITSTAGE_LOCAL) {
-        updatePayload();
+
+        sendSelfGenPacket();
+    }
+}
+
+void DadcaAckProtocolSensor::handleMessage(cMessage *msg) {
+    auto message = static_cast<CommunicationCommand *>(msg);
+
+    bool handled = false;
+
+    if (message != nullptr && message->getPayloadTemplate() != nullptr && message->isSelfMessage()) {
+        auto payload = static_cast<const DadcaAckMessage *>(message->getPayloadTemplate());
+
+        if (payload != nullptr && payload->getMessageType() == DadcaAckMessageType::INT_GEN_MESSAGE) {
+            Messages += 1; // Generate a new message
+            cancelAndDelete(msg);
+
+            // Schedule again for next simulated second (INT_GEN_MESSAGE)
+            sendSelfGenPacket();
+
+            handled = true;
+
+            return;
+        }
+    }
+
+    if (!handled) {
+        CommunicationProtocolBase::handleMessage(msg);
     }
 }
 
 void DadcaAckProtocolSensor::handlePacket(Packet *pk) {
     auto payload = pk->peekAtBack<DadcaAckMessage>(B(34), 1);
 
+       if(payload != nullptr) {
+           if(payload->getMessageType() == DadcaAckMessageType::UAV_PING_HEARTBEAT)
+           {
+               EV_DETAIL << this->getParentModule()->getFullName() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
+               tentativeTarget = payload->getSourceID();
+               tentativeTargetName = pk->getName();
 
-    if(payload != nullptr) {
-        if(payload->getMessageType() == DadcaAckMessageType::HEARTBEAT)
-        {
-            std::cout << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
-            tentativeTarget = payload->getSourceID();
-            tentativeTargetName = pk->getName();
-            setTarget(tentativeTargetName.c_str());
-            updatePayload();
-        }
-    }
+
+               nlohmann::json jsonMap = nlohmann::json::parse(payload->getAcks());
+               std::unordered_map<std::string, long> receivedAcks = jsonMap.get<std::unordered_map<std::string, long>>();
+
+               const char *myId = this->getParentModule()->getFullName();
+
+               auto iter = receivedAcks.find(myId);
+               if (iter != receivedAcks.end()) {
+                   EV_DEBUG << "Key found. Value: " << iter->second << std::endl;
+                   long lastReceivedAck = iter->second;
+                   // if m->acks[MyId] > LastAckedMessage:
+                   if (lastReceivedAck > LastAckedMessage) {
+                       //   LastAckedMessage = m->acks[MyId]
+                       LastAckedMessage = lastReceivedAck;
+                       //   clear acked messages
+                       // TODO
+                   }
+               } else {
+                   EV_DEBUG << "Key not found. My ID: " << myId << std::endl << "Acks received map: " << payload->getAcks() << std::endl;
+               }
+
+               // send $SENSOR\_MESSAGES$
+               //  - Messages
+
+               sendMessage(tentativeTargetName.c_str());
+           } else {
+               EV_DEBUG << std::endl << "[DadcaAckSensor] Ignoring received message " << payload->getMessageType() << std::endl;
+           }
+       }
 }
 
-void DadcaAckProtocolSensor::updatePayload() {
+void DadcaAckProtocolSensor::sendSelfGenPacket() {
+    if (everySecondControlPacket != nullptr) {
+        delete everySecondControlPacket;
+    }
+
+    everySecondControlPacket = new DadcaAckMessage();
+    everySecondControlPacket->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+    everySecondControlPacket->setMessageType(DadcaAckMessageType::INT_GEN_MESSAGE);
+    everySecondControlPacket->setSourceID(this->getParentModule()->getId());
+    everySecondControlPacket->setDestinationID(this->getParentModule()->getId());
+
+    CommunicationCommand *command = new CommunicationCommand();
+    command->setCommandType(SET_PAYLOAD);
+    command->setPayloadTemplate(everySecondControlPacket);
+    // TODO try with cMessage
+
+    scheduleAt(simTime() + 1.0, command);
+}
+
+void DadcaAckProtocolSensor::sendMessage(const char *target) {
     DadcaAckMessage *payload = new DadcaAckMessage();
     payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
 
     payload->setMessageType(DadcaAckMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);
-    std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
+
+    // Send last Message index
+    std::unordered_map<std::string, std::pair<long, long>> ranges;
+    std::pair<long, long> r(LastAckedMessage, Messages);
+    ranges[this->getParentModule()->getFullName()] = r;
+
+    nlohmann::json jsonMap = ranges;
+
+    // Set Message Ranges field
+    payload->setMessageRanges(jsonMap.dump().c_str());
+
+    EV_DETAIL << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     lastPayload = *payload;
 
     CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_PAYLOAD);
+    command->setCommandType(SEND_MESSAGE);
     command->setPayloadTemplate(payload);
-    sendCommand(command);
-}
-
-void DadcaAckProtocolSensor::setTarget(const char *target) {
-    CommunicationCommand *command = new CommunicationCommand();
-    command->setCommandType(SET_TARGET);
     command->setTarget(target);
     sendCommand(command);
 }

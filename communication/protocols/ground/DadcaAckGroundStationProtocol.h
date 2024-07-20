@@ -13,10 +13,12 @@
 // along with this program.  If not, see http://www.gnu.org/licenses/.
 // 
 
-#ifndef __PROJETO_DadcaAckGroundStationProtocol_H_
-#define __PROJETO_DadcaAckGroundStationProtocol_H_
+#ifndef __PROJETO_DadcaAckGroundProtocol_H_
+#define __PROJETO_DadcaAckGroundProtocol_H_
 
+#include <unordered_map>
 #include <omnetpp.h>
+#include "../json.hpp"
 #include "../base/CommunicationProtocolBase.h"
 #include "../../messages/network/DadcaAckMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
@@ -28,7 +30,7 @@ namespace projeto {
 enum CommunicationStatus { FREE=0, REQUESTING=1, PAIRED=2, COLLECTING=3, PAIRED_FINISHED=4 };
 
 /*
- * DadcaAckGroundStationProtocol implements a protocol that recieves and sends DadcaMessages to simulate a
+ * DadcaProtocol implements a protocol that recieves and sends DadcaAckMessages to simulate a
  * drone collecting data from sensors and sharing it with other drones. This protocol implements
  * the DADCA protocol.
  */
@@ -57,8 +59,6 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
 
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();
@@ -66,10 +66,12 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
 
         DadcaAckMessage lastPayload = DadcaAckMessage();
 
+        std::unordered_map<std::string, long> acks; //Map<SensorId, LastAcked> acks;
+
     protected:
         virtual void initialize(int stage) override;
 
-        // Saves telemetry recieved by mobility
+        // Saves telemetry received by mobility
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override;
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
@@ -77,10 +79,12 @@ class DadcaAckGroundStationProtocol : public CommunicationProtocolBase
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+
+        virtual void finish() override;
     private:
-        // Sends sequence of orders that defines a rendevouz point, navigates
-        // to it and reverses
-        virtual void rendevouz();
+
+        void updateAcks(const char *incomingMessageRanges);
+        void ackRefresh();
 
         // Updates payload that communication will send
         virtual void updatePayload();

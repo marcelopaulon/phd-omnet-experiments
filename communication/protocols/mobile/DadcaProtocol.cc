@@ -25,9 +25,42 @@
 #include "inet/applications/base/ApplicationPacket_m.h"
 #include "../../../applications/mamapp/BMeshPacket_m.h"
 
+#include <sstream>
+#include <unordered_set>
+
 namespace projeto {
 
 Define_Module(DadcaProtocol);
+
+void DadcaProtocol::finish() {
+    currentDataLoad = countDistinctIds(curMessageIds, true);
+    emit(dataLoadSignalID, currentDataLoad);
+    CommunicationProtocolBase::finish();
+}
+
+int DadcaProtocol::countDistinctIds(const std::string& input, bool forced) {
+    simtime_t currentTime = simTime();
+
+    // Check if close to 1 second has passed or forced mode
+    if (currentTime - lastTime < 1.0 && !forced) {
+        return currentDataLoad;
+    }
+
+    lastTime = currentTime;
+
+    std::unordered_set<std::string> uniqueIds;
+    std::istringstream iss(input);
+    std::string id;
+
+    while (std::getline(iss, id, ';')) {
+        // Ignore empty strings
+        if (!id.empty()) {
+            uniqueIds.insert(id);
+        }
+    }
+
+    return static_cast<int>(uniqueIds.size());
+}
 
 void DadcaProtocol::initialize(int stage)
 {
@@ -49,6 +82,10 @@ void DadcaProtocol::initialize(int stage)
         WATCH(tentativeTarget);
         WATCH(lastTarget);
         WATCH(currentDataLoad);
+
+        if (strcmp(this->getParentModule()->getName(), "groundStation") == 0) {
+            isCurNodeGroundsStation = true;
+        }
     }
 }
 
@@ -88,9 +125,38 @@ void DadcaProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
     updatePayload();
 }
 
-void DadcaProtocol::handlePacket(Packet *pk) {
-    auto payload = dynamicPtrCast<const DadcaMessage>(pk->peekAtBack());
+void DadcaProtocol::handleMessage(cMessage *msg)
+{
+    CommunicationCommand *command = dynamic_cast<CommunicationCommand *>(msg);
 
+    if(command != nullptr) {
+        switch (command->getCommandType()) {
+        case FAIL_COMMS:
+            failedComms = true;
+            break;
+        case FAIL_STORAGE:
+            failedStorage = true;
+            currentDataLoad = 0;
+            curMessageIds = "";
+            break;
+        case FAIL_END:
+            failedComms = false;
+            failedStorage = false;
+            break;
+        default:
+            break;
+        }
+    } else {
+        CommunicationProtocolBase::handleMessage(msg);
+    }
+}
+
+void DadcaProtocol::handlePacket(Packet *pk) {
+    if (failedComms) {
+        return;
+    }
+
+    auto payload = dynamicPtrCast<const DadcaMessage>(pk->peekAtBack());
 
     if(payload != nullptr) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;
@@ -126,7 +192,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
+                        EV_DETAIL << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
                     }
                 }
                 break;
@@ -149,11 +215,11 @@ void DadcaProtocol::handlePacket(Packet *pk) {
 
                 if(isTimedout()) {
                     if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
+                        EV_DETAIL << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
                         communicationStatus = PAIRED;
                     }
                 } else {
-                    std::cout << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
                     tentativeTarget = payload->getSourceID();
                     tentativeTargetName = pk->getName();
                     initiateTimeout(timeoutDuration);
@@ -173,7 +239,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
                         // If both drones are travelling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
@@ -181,8 +247,9 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             // Exchanging imaginary data to the drone closest to the start of the mission
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
-
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
+                                curMessageIds += payload->getMessageIds();
+                                currentDataLoad = countDistinctIds(curMessageIds, false);
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -193,6 +260,7 @@ void DadcaProtocol::handlePacket(Packet *pk) {
                             } else {
                                 // Drone farthest away loses data
                                 currentDataLoad = 0;
+                                curMessageIds = "";
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -219,10 +287,40 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             case DadcaMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
-                    stableDataLoad = currentDataLoad;
+                    EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
+                    std::string tempIds = payload->getMessageIds();
+
+                    curMessageIds += tempIds;
+                    currentDataLoad = countDistinctIds(curMessageIds, false);
                     emit(dataLoadSignalID, currentDataLoad);
+
+                    /////
+                    // send ACK_DATA_COLLECTION ack message
+                    DadcaMessage *payload = new DadcaMessage();
+                    payload->addTag<CreationTimeTag>()->setCreationTime(simTime());
+
+                    // Sets the reverse flag on the payload
+                    payload->setReversed(lastStableTelemetry.isReversed());
+                    payload->setNextWaypointID(lastStableTelemetry.getNextWaypointID());
+                    payload->setLastWaypointID(lastStableTelemetry.getLastWaypointID());
+
+                    payload->setLeftNeighbours(leftNeighbours);
+                    payload->setRightNeighbours(rightNeighbours);
+
+                    payload->setSourceID(this->getParentModule()->getId());
+                    payload->setMessageType(DadcaMessageType::ACK_DATA_COLLECTION);
+
+                    if (!isCurNodeGroundsStation) {
+                        payload->setMessageIds(curMessageIds.c_str());
+                    }
+
+                    CommunicationCommand *command = new CommunicationCommand();
+                    command->setCommandType(SEND_MESSAGE);
+                    command->setPayloadTemplate(payload);
+                    sendCommand(command);
+                    /////
+
                     initiateTimeout(timeoutDuration);
 
                     communicationStatus = COLLECTING;
@@ -231,13 +329,13 @@ void DadcaProtocol::handlePacket(Packet *pk) {
             }
         }
         updatePayload();
+        return;
     }
 
     auto mamPayload = dynamicPtrCast<const BMeshPacket>(pk->peekAtBack());
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
             currentDataLoad++;
-            stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
@@ -368,14 +466,14 @@ void DadcaProtocol::updatePayload() {
         case FREE:
         {
             payload->setMessageType(DadcaMessageType::HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to heartbeat" << endl;
+            EV_DETAIL << payload->getSourceID() << " set to heartbeat" << endl;
             break;
         }
         case REQUESTING:
         {
             payload->setMessageType(DadcaMessageType::PAIR_REQUEST);
             payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
             break;
         }
         case PAIRED:
@@ -383,9 +481,13 @@ void DadcaProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
 
-            std::cout << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
+            currentDataLoad = countDistinctIds(curMessageIds, true);
+            emit(dataLoadSignalID, currentDataLoad);
+
+            payload->setDataLength(currentDataLoad);
+
+            EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
         }
         case COLLECTING:
@@ -398,11 +500,17 @@ void DadcaProtocol::updatePayload() {
             payload->getDestinationID() != lastPayload.getDestinationID() ||
             payload->getNextWaypointID() != lastPayload.getNextWaypointID() ||
             payload->getLastWaypointID() != lastPayload.getLastWaypointID() ||
+            payload->getDataLength() != lastPayload.getDataLength() ||
             payload->getReversed() != lastPayload.getReversed()) {
         lastPayload = *payload;
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
+
+        if (!isCurNodeGroundsStation) {
+            payload->setMessageIds(curMessageIds.c_str());
+        }
+
         command->setPayloadTemplate(payload);
         sendCommand(command);
     } else {
@@ -440,7 +548,6 @@ void DadcaProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }

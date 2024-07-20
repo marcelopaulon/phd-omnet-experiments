@@ -20,10 +20,14 @@ namespace inet;
 
 enum DadcaAckMessageType
 {
-  HEARTBEAT = 0; 
-  PAIR_REQUEST = 1; 
+  UAV_PING_HEARTBEAT = 0; 
+  PAIR_REQUEST_BASE_PING = 1; 
   PAIR_CONFIRM = 2;
   BEARER = 3;
+  SENSOR_MESSAGES = 4;
+  UAV_MESSAGES = 5;
+  BASE_ACK = 6;
+  INT_GEN_MESSAGE = 7;
 }
 
 class DadcaAckMessage extends FieldsChunk
@@ -37,5 +41,7 @@ class DadcaAckMessage extends FieldsChunk
   int leftNeighbours = 0; // Neighbours to the left of the drone
   int rightNeighbours = 0; // Neighbours to the right of the drone
   bool reversed = false; // Reverse flag which indicates the current direction the drone is travelling in
-  DadcaAckMessageType messageType = HEARTBEAT; // Type of message
+  DadcaAckMessageType messageType = UAV_PING_HEARTBEAT; // Type of message
+  string acks = ""; // acks serialized map
+  string messageRanges = ""; // messageRanges serialized map
 }

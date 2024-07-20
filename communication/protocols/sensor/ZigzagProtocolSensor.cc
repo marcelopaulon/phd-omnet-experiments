@@ -42,7 +42,7 @@ void ZigzagProtocolSensor::handlePacket(Packet *pk) {
         {
             tentativeTarget = payload->getSourceID();
             tentativeTargetName = pk->getName();
-            std::cout << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
+            EV_DETAIL << this->getParentModule()->getFullName() << " recieved heartbeat from " << tentativeTarget << endl;
             setTarget(tentativeTargetName.c_str());
             updatePayload();
         }
@@ -56,7 +56,7 @@ void ZigzagProtocolSensor::updatePayload() {
     payload->setMessageType(ZigzagMessageType::BEARER);
     payload->setSourceID(this->getParentModule()->getId());
     payload->setDestinationID(tentativeTarget);
-    std::cout << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
+    EV_DETAIL << payload->getSourceID() << " sending bearer to " << tentativeTarget  << endl;
 
     CommunicationCommand *command = new CommunicationCommand();
     command->setCommandType(SET_PAYLOAD);

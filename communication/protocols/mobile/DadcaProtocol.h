@@ -57,8 +57,6 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
 
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();
@@ -66,6 +64,16 @@ class DadcaProtocol : public CommunicationProtocolBase
 
         DadcaMessage lastPayload = DadcaMessage();
 
+        std::string curMessageIds = "";
+
+        bool isCurNodeGroundsStation = false;
+
+        int countDistinctIds(const std::string& input, bool forced);
+
+        simtime_t lastTime;
+
+        bool failedComms = false;
+        bool failedStorage = false;
     protected:
         virtual void initialize(int stage) override;
 
@@ -73,10 +81,13 @@ class DadcaProtocol : public CommunicationProtocolBase
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override;
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
+        virtual void handleMessage(cMessage *msg) override;
         // Checks if timeout has finished and resets parameters if it has
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+
+        virtual void finish() override;
     private:
         // Sends sequence of orders that defines a rendevouz point, navigates
         // to it and reverses

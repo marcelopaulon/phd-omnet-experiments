@@ -19,15 +19,21 @@ namespace projeto {
 Define_Module(DroneMobility);
 
 void DroneMobility::initialize(int stage) {
-    VehicleMobility::initialize(stage);
-    verticalSpeed = par("verticalSpeed");
-    startTime = par("startTime");
-    droneStatus.currentYawSpeed = par("yawSpeed");
+    if (stage == 5000) {
+        // Update routes from waypoint file
+        waypoints.clear();
+        readWaypointsFromFile(par("waypointFile"));
+    } else {
+        VehicleMobility::initialize(stage);
+        verticalSpeed = par("verticalSpeed");
+        startTime = par("startTime");
+        droneStatus.currentYawSpeed = par("yawSpeed");
 
-    homeLatitude = par("homeLatitude");
-    homeLongitude = par("homeLongitude");
+        homeLatitude = par("homeLatitude");
+        homeLongitude = par("homeLongitude");
 
-    sendTelemetry(true);
+        sendTelemetry(true);
+    }
 }
 
 void DroneMobility::setInitialPosition() {

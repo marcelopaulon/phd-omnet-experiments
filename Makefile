@@ -2,7 +2,7 @@
 # OMNeT++/OMNEST Makefile for projeto
 #
 # This file was generated with the command:
-#  opp_makemake -f --deep -O out -KINET_PROJ=C:/Users/marce/omnetpp-5.6.2/samples/inet -DINET_IMPORT -I. -I$$\(INET_PROJ\)/src -L$$\(INET_PROJ\)/src -lINET$$\(D\)
+#  opp_makemake -f --deep -O out -KINET_PROJ=C:/omnetpp-5.6.2/samples/inet -DINET_IMPORT -I. -I$$\(INET_PROJ\)/src -L$$\(INET_PROJ\)/src -lINET$$\(D\)
 #
 
 # Name of target to be created (-o option)
@@ -100,7 +100,7 @@ MSGFILES = \
 SMFILES =
 
 # Other makefile variables (-K)
-INET_PROJ=C:/Users/marce/omnetpp-5.6.2/samples/inet
+INET_PROJ=C:/omnetpp-5.6.2/samples/inet
 
 #------------------------------------------------------------------------------
 

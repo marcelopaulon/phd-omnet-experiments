@@ -176,7 +176,8 @@ void UdpBasicAppMobileNode::processStart()
 void UdpBasicAppMobileNode::processSend()
 {
     sendPacket();
-    simtime_t d = simTime() + par("sendInterval");
+    simtime_t randomDelay = uniform(-0.002, 0.002);
+    simtime_t d = simTime() + par("sendInterval") + randomDelay;
     int time = (d - simTime()).inUnit(SimTimeUnit::SIMTIME_MS);
     if (stopTime < SIMTIME_ZERO || d < stopTime) {
         selfMsg->setKind(SEND);
@@ -195,7 +196,7 @@ void UdpBasicAppMobileNode::processStop()
 
 void UdpBasicAppMobileNode::handleMessageWhenUp(cMessage *msg)
 {
-    //std::cout  << " UdpBasicAppMobileNode::handleMessageWhenUp: " << msg->getClassName() << endl;
+    //EV_TRACE  << " UdpBasicAppMobileNode::handleMessageWhenUp: " << msg->getClassName() << endl;
 
     if (msg->isSelfMessage()) {
         ASSERT(msg == selfMsg);
@@ -252,8 +253,8 @@ void UdpBasicAppMobileNode::refreshDisplay() const
 
 void UdpBasicAppMobileNode::processPacket(Packet *pk)
 {
-    std::cout  << " UdpBasicAppMobileNode::processPacket " << pk->getClassName() << endl;
-    std::cout  << " UdpBasicAppMobileNode::processPacket " << UdpSocket::getReceivedPacketInfo(pk) << endl;
+    EV_TRACE  << " UdpBasicAppMobileNode::processPacket " << pk->getClassName() << endl;
+    EV_TRACE  << " UdpBasicAppMobileNode::processPacket " << UdpSocket::getReceivedPacketInfo(pk) << endl;
 
     emit(packetReceivedSignal, pk);
     EV_INFO << "Received packet: " << UdpSocket::getReceivedPacketInfo(pk) << endl;

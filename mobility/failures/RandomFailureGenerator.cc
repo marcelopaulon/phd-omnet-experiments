@@ -16,6 +16,7 @@
 #include "RandomFailureGenerator.h"
 
 #include "../../communication/messages/internal/MobilityCommand_m.h"
+#include "../../communication/messages/internal/CommunicationCommand_m.h"
 
 namespace projeto {
 
@@ -33,6 +34,9 @@ void RandomFailureGenerator::initialize()
     failureRollTime = par("failureRollTime");
     failureChance = par("failureChance");
     failureDuration = par("failureDuration");
+    movementFailures = par("movementFailures");
+    communicationFailures = par("communicationFailures");
+    storageFailures = par("storageFailures");
 
     timerMessage = new cMessage();
     timerMessage->setKind(INTERVAL);
@@ -50,12 +54,34 @@ void RandomFailureGenerator::handleMessage(cMessage *msg)
                 EV_INFO << "Rolled " << rng << std::endl;
                 if(rng - failureChance <= 0) {
                     EV_INFO << "Triggering failure" << std::endl;;
-                    MobilityCommand *shutdownCommand = new MobilityCommand();
-                    shutdownCommand->setCommandType(FORCE_SHUTDOWN);
+                    if (movementFailures) {
+                        MobilityCommand *shutdownCommand = new MobilityCommand();
+                        shutdownCommand->setCommandType(FORCE_SHUTDOWN);
 
-                    cGate *protocolGate = gate("mobilityGate$o");
-                    if(protocolGate->isConnected()) {
-                        send(shutdownCommand, protocolGate);
+                        cGate *protocolGate = gate("mobilityGate$o");
+                        if(protocolGate->isConnected()) {
+                            send(shutdownCommand, protocolGate);
+                        }
+                    }
+
+                    if (communicationFailures) {
+                        CommunicationCommand *failCommand = new CommunicationCommand();
+                        failCommand->setCommandType(FAIL_COMMS);
+
+                        cGate *protocolGate = gate("protocolGate$o");
+                        if(protocolGate->isConnected()) {
+                            send(failCommand, protocolGate);
+                        }
+                    }
+
+                    if (storageFailures) {
+                        CommunicationCommand *failCommand = new CommunicationCommand();
+                        failCommand->setCommandType(FAIL_STORAGE);
+
+                        cGate *protocolGate = gate("protocolGate$o");
+                        if(protocolGate->isConnected()) {
+                            send(failCommand, protocolGate);
+                        }
                     }
 
                     msg->setKind(WAKE);

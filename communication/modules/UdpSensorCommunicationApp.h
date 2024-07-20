@@ -30,6 +30,7 @@ class UdpSensorCommunicationApp: public UdpBasicAppMobileSensorNode {
         virtual void setSocketOptions() override;
         virtual void sendPacket() override { return; };
         virtual void sendPacket(char *target);
+        virtual void sendPacket(const FieldsChunk* payload, const char *target);
         virtual void handleMessageWhenUp(cMessage *msg) override;
         virtual void processPacket(Packet *pk) override;
 };

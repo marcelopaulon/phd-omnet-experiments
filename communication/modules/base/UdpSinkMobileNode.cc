@@ -53,7 +53,7 @@ void UdpSinkMobileNode::initialize(int stage)
 
 void UdpSinkMobileNode::handleMessageWhenUp(cMessage *msg)
 {
-    //std::cout  << " UdpSinkMobileNode::handleMessageWhenUp: " << msg->getClassName() << endl;
+    //EV_TRACE  << " UdpSinkMobileNode::handleMessageWhenUp: " << msg->getClassName() << endl;
 
     if (msg->isSelfMessage()) {
         ASSERT(msg == selfMsg);
@@ -152,7 +152,7 @@ void UdpSinkMobileNode::processStop()
 void UdpSinkMobileNode::processPacket(Packet *pk)
 {
     // Olivieri:
-    //std::cout  << "UdpSinkMobileNode::socketDataArrived = " << pk->getName() << endl;
+    //EV_TRACE  << "UdpSinkMobileNode::socketDataArrived = " << pk->getName() << endl;
 
     auto myParentNode = this->getParentModule();
     MobileNode* node = ((MobileNode*)myParentNode);

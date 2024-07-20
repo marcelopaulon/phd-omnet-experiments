@@ -25,6 +25,9 @@
 #include "inet/applications/base/ApplicationPacket_m.h"
 #include "../../../applications/mamapp/BMeshPacket_m.h"
 
+#include <inet/mobility/static/StationaryMobility.h>
+#include "../../../mobility/DroneMobility.h"
+
 namespace projeto {
 
 Define_Module(DadcaAckUAVProtocol);
@@ -33,13 +36,23 @@ void DadcaAckUAVProtocol::initialize(int stage)
 {
     CommunicationProtocolBase::initialize(stage);
 
+    bufferSizeVector.setName("bufferSizeVector");
+    baseDistanceVector.setName("baseDistanceVector");
+
+    record1sStatisticsEvent = new cMessage("record1sStatisticsEvent");
+    scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the first event after 1 second
+
     if(stage == INITSTAGE_LOCAL) {
         timeoutDuration = par("timeoutDuration");
+        maxBufferSize = par("maxBufferSize");
 
-        int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
+        //int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
         // Signal that carries current data load and is emitted every time it is updated
         dataLoadSignalID = registerSignal("dataLoad");
         emit(dataLoadSignalID, currentDataLoad);
+
+        bufferLoadSignalID = registerSignal("bufferLoad");
+        emit(bufferLoadSignalID, currentBufferLoad);
 
         updatePayload();
 
@@ -49,7 +62,85 @@ void DadcaAckUAVProtocol::initialize(int stage)
         WATCH(tentativeTarget);
         WATCH(lastTarget);
         WATCH(currentDataLoad);
+        WATCH(currentBufferLoad);
     }
+}
+
+void DadcaAckUAVProtocol::handleMessage(cMessage *msg)
+{
+    CommunicationCommand *command = dynamic_cast<CommunicationCommand *>(msg);
+
+    if (command != nullptr) {
+        switch (command->getCommandType()) {
+        case FAIL_COMMS:
+            failedComms = true;
+            break;
+        case FAIL_STORAGE:
+            failedStorage = true;
+            currentDataLoad = 0;
+            currentBufferLoad = 0;
+            acks.clear();
+            messages.clear();
+            messageRanges.clear();
+            break;
+        case FAIL_END:
+            failedComms = false;
+            failedStorage = false;
+            break;
+        default:
+            break;
+        }
+    } else if (msg == record1sStatisticsEvent) {
+        record1sStatistics();
+        scheduleAt(simTime() + 1.0, record1sStatisticsEvent); // Schedule the next event after 1 second
+    } else {
+        CommunicationProtocolBase::handleMessage(msg);
+    }
+}
+
+class FindGSPositionVisitor : public cVisitor {
+public:
+    FindGSPositionVisitor() {
+
+    }
+
+    Coord groundStationPosition;
+
+    void visit(cObject *obj) override {
+        if (strcmp(obj->getName(), "groundStation") == 0) {
+            cModule *module = check_and_cast<cModule*>(obj);
+            cObject *mobilityObj = module->findObject("mobility");
+            StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
+            groundStationPosition = mobility->getCurrentPosition(); // .x and .y --> coords
+        }
+    }
+};
+
+void DadcaAckUAVProtocol::record1sStatistics()
+{
+    simtime_t now = simTime();
+
+    bufferSizeVector.recordWithTimestamp(now, currentBufferLoad);
+
+    if (baseStationX == -1 && baseStationY == -1) {
+        // Find ground station
+        cModule *topModule = getModuleByPath("<root>");  // Get the top-level module
+
+        FindGSPositionVisitor visitor;
+        topModule->forEachChild(&visitor);
+
+        baseStationX = visitor.groundStationPosition.x;
+        baseStationY = visitor.groundStationPosition.y;
+    }
+
+    cObject *mobilityObj = this->getParentModule()->findObject("mobility");
+    DroneMobility *mobility = check_and_cast<DroneMobility*>(mobilityObj);
+
+    Coord curPosition = mobility->getCurrentPosition();
+    double xDelta = baseStationX - curPosition.x;
+    double yDelta = baseStationY - curPosition.y;
+    double distanceToBase = sqrt(xDelta*xDelta + yDelta*yDelta);
+    baseDistanceVector.recordWithTimestamp(now, distanceToBase);
 }
 
 void DadcaAckUAVProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
@@ -89,14 +180,17 @@ void DadcaAckUAVProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
 }
 
 void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
-    auto payload = dynamicPtrCast<const DadcaAckMessage>(pk->peekAtBack());
+    if (failedComms) {
+        return;
+    }
 
+    auto payload = dynamicPtrCast<const DadcaAckMessage>(pk->peekAtBack());
 
     if(payload != nullptr) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;
 
         switch(payload->getMessageType()) {
-            case DadcaAckMessageType::HEARTBEAT:
+            case DadcaAckMessageType::UAV_PING_HEARTBEAT:
             {
                 // No communication from other drones matters while the drone is executing
                 // or if the drone is recharging/shutdown
@@ -126,12 +220,12 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
+                        EV_DETAIL << this->getParentModule()->getId() << " recieved UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
                     }
                 }
                 break;
             }
-            case DadcaAckMessageType::PAIR_REQUEST:
+            case DadcaAckMessageType::PAIR_REQUEST_BASE_PING:
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
@@ -149,11 +243,11 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 if(isTimedout()) {
                     if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
+                        EV_DETAIL << payload->getDestinationID() << " received a pair request while timed out from " << payload->getSourceID() << endl;
                         communicationStatus = PAIRED;
                     }
                 } else {
-                    std::cout << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " received a pair request while not timed out from  " << payload->getSourceID() << endl;
                     tentativeTarget = payload->getSourceID();
                     tentativeTargetName = pk->getName();
                     initiateTimeout(timeoutDuration);
@@ -163,26 +257,28 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
 
                 break;
             }
-            case DadcaAckMessageType::PAIR_CONFIRM:
+            case DadcaAckMessageType::PAIR_CONFIRM: // partially equivalent to UAV_MESSAGES?
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
                     break;
                 }
 
+                updateAcks(payload->getAcks());
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
-                        // If both drones are travelling in the same direction, the pairing is canceled
+                        // If both drones are traveling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
                         if((lastStableTelemetry.isReversed() != payload->getReversed()) || (tour.size() == 0 || destinationIsGroundstation)) {
-                            // Exchanging imaginary data to the drone closest to the start of the mission
+                            updateRanges(payload->getMessageRanges());
+
+                            // Exchanging imaginary data to the drone closest to the start of the mission - equivalent to UAV_MESSAGES behavior?
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
-
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -192,7 +288,7 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                                 }
                             } else {
                                 // Drone farthest away loses data
-                                currentDataLoad = 0;
+                                //currentDataLoad = 0;
 
                                 // Doesn't update neighbours if the drone has no waypoints
                                 // This prevents counting the groundStation as a drone
@@ -219,9 +315,12 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
             case DadcaAckMessageType::BEARER:
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
-                    stableDataLoad = currentDataLoad;
+                    EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
+                    EV_DETAIL << payload->getMessageRanges() << endl;
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
+
+                    updateRanges(payload->getMessageRanges());
+
                     emit(dataLoadSignalID, currentDataLoad);
                     initiateTimeout(timeoutDuration);
 
@@ -229,6 +328,10 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
                 }
                 break;
             }
+
+            default:
+                EV_DETAIL << std::endl << "[DadcaAckUAV] Ignoring received message " << payload->getMessageType() << std::endl;
+                break;
         }
         updatePayload();
     }
@@ -236,11 +339,118 @@ void DadcaAckUAVProtocol::handlePacket(Packet *pk) {
     auto mamPayload = dynamicPtrCast<const BMeshPacket>(pk->peekAtBack());
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
-            currentDataLoad++;
-            stableDataLoad = currentDataLoad;
+            //currentDataLoad++; what?
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
+}
+
+void DadcaAckUAVProtocol::updateAcks(const char *incomingAcks) {
+    if (strcmp(incomingAcks, "") == 0) {
+        return;
+    }
+
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingAcks);
+    std::unordered_map<std::string, long> incomingAcksMap = jsonMap.get<std::unordered_map<std::string, long>>();
+
+    for (const auto& pair : incomingAcksMap) {
+        const std::string& key = pair.first;
+        long incomingAck = pair.second;
+
+        auto iter = acks.find(key);
+        if (iter != acks.end()) {
+            iter->second = std::max(iter->second, incomingAck);
+        } else {
+            acks[key] = incomingAck;
+        }
+
+        // Discard acked messages
+        auto iterRanges = messageRanges.find(key);
+        if (iterRanges != messageRanges.end()) {
+            std::pair<long, long>& messageRange = iterRanges->second;
+            if (messageRange.first < incomingAck) {
+                messageRange.first = incomingAck;
+            }
+
+            if (messageRange.second < incomingAck) {
+                messageRange.second = incomingAck;
+            }
+        }
+    }
+
+    ///// UPDATE BUFFER STATS
+    long newBufferLoad = 0;
+    for (const auto& pair : messageRanges) {
+        //const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        newBufferLoad += (range.second - range.first);
+    }
+    currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
+    emit(bufferLoadSignalID, currentBufferLoad);
+    ///// UPDATE BUFFER STATS
+}
+
+void DadcaAckUAVProtocol::updateRanges(const char *incomingRanges) {
+    if (strcmp(incomingRanges, "") == 0) {
+        return;
+    }
+
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingRanges);
+    std::unordered_map<std::string, std::pair<long,long>> receivedRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
+
+    assert(currentBufferLoad <= maxBufferSize);
+    long newBufferLoadTemp = currentBufferLoad;
+
+    ///// UPDATE RANGES START
+    for (const auto& pair : receivedRanges) {
+        const std::string& key = pair.first;
+        const std::pair<long, long>& receivedRange = pair.second;
+
+        auto iter = messageRanges.find(key);
+        if (iter != messageRanges.end()) {
+            std::pair<long, long>& messageRange = iter->second;
+            long originalLoad = (messageRange.second - messageRange.first);
+            messageRange.first = std::min(messageRange.first, receivedRange.first);
+            messageRange.second = std::max(messageRange.second, receivedRange.second);
+            long newLoad = (messageRange.second - messageRange.first);
+            if (newLoad != originalLoad) {
+                if (newBufferLoadTemp + newLoad > maxBufferSize) {
+                    // Remove ranges that would make the buffer size exceed maxBufferSize
+                    messageRange.second -= (newBufferLoadTemp + newLoad - maxBufferSize);
+                    newLoad = (messageRange.second - messageRange.first);
+                }
+                newBufferLoadTemp += (newLoad - originalLoad);
+            }
+        } else {
+            std::pair<long, long> newRange = receivedRange;
+            long newLoad = (newRange.second - newRange.first);
+            if (newBufferLoadTemp + newLoad > maxBufferSize) {
+                // Remove ranges that would make the buffer size exceed maxBufferSize
+                newRange.second -= (newBufferLoadTemp + newLoad - maxBufferSize);
+                newLoad = (newRange.second - newRange.first);
+            }
+            newBufferLoadTemp += newLoad;
+            messageRanges[key] = newRange;
+        }
+    }
+    ///// UPDATE RANGES END
+
+    ///// UPDATE BUFFER STATS
+    long newBufferLoad = 0;
+    for (const auto& pair : messageRanges) {
+        //const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        newBufferLoad += (range.second - range.first);
+    }
+    EV_DETAIL << currentBufferLoad << std::endl << newBufferLoadTemp << std::endl << newBufferLoad;
+    assert(newBufferLoadTemp == newBufferLoad); // Sanity check
+    currentBufferLoad = newBufferLoad;  // TODO: check for int overflow?
+    emit(bufferLoadSignalID, currentBufferLoad);
+    ///// UPDATE BUFFER STATS
+
+    //
+    currentDataLoad = currentBufferLoad;
+    emit(dataLoadSignalID, currentDataLoad);
 }
 
 void DadcaAckUAVProtocol::rendevouz() {
@@ -367,15 +577,15 @@ void DadcaAckUAVProtocol::updatePayload() {
     switch(communicationStatus) {
         case FREE:
         {
-            payload->setMessageType(DadcaAckMessageType::HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to heartbeat" << endl;
+            payload->setMessageType(DadcaAckMessageType::UAV_PING_HEARTBEAT);
+            EV_DETAIL << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
             break;
         }
         case REQUESTING:
         {
-            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST);
+            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST_BASE_PING);
             payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
             break;
         }
         case PAIRED:
@@ -383,9 +593,8 @@ void DadcaAckUAVProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaAckMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
 
-            std::cout << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
         }
         case COLLECTING:
@@ -400,6 +609,20 @@ void DadcaAckUAVProtocol::updatePayload() {
             payload->getLastWaypointID() != lastPayload.getLastWaypointID() ||
             payload->getReversed() != lastPayload.getReversed()) {
         lastPayload = *payload;
+
+        nlohmann::json jsonMap = acks;
+
+        // Set acks
+        payload->setAcks(jsonMap.dump().c_str());
+
+        if (payload->getMessageType() == DadcaAckMessageType::BEARER
+                || payload->getMessageType() == DadcaAckMessageType::PAIR_CONFIRM) { // UAV_MESSAGES equivalent?
+            nlohmann::json jsonMap = messageRanges;
+
+            // Set message ranges
+            payload->setMessageRanges(jsonMap.dump().c_str());
+            EV_DETAIL << "UAV forwarding message ranges: " << payload->getMessageRanges() << std::endl;
+        }
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
@@ -440,7 +663,6 @@ void DadcaAckUAVProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }

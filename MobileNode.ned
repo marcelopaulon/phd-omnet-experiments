@@ -19,7 +19,6 @@ module MobileNode extends AdhocHost
 
 
         @class(MobileNode);
-
     submodules:
         protocol: <default("CommunicationProtocolBase")> like IProtocol {
             @display("p=237.825,75.6");
@@ -34,6 +33,7 @@ module MobileNode extends AdhocHost
 
         for i=0..numFailures-1 {
             failures[i].mobilityGate <--> mobility.protocolGate++;
+            failures[i].protocolGate <--> protocol.communicationGate++;
         }
 
 

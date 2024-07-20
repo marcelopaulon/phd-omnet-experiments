@@ -22,5 +22,9 @@ simple DadcaAckUAVProtocol extends CommunicationProtocolBase
     parameters:
         @class(DadcaAckUAVProtocol);
         @signal[dataLoad](type=long); // Declaration of dataLoad signal used to track current data load that the drone is carrying
+        @statistic[dataReceived](title="dadca data received by UAV"; source="dataLoad"; record=max,mean,sum; interpolationmode=none);
+        @signal[bufferLoad](type=long);
+        @statistic[bufferLoad](title="dadca-ack buffer load"; source="bufferLoad"; record=max,mean,vector; interpolationmode=none);
         double timeoutDuration @unit(s) = default(3s);
+        int maxBufferSize = default(10000);
 }

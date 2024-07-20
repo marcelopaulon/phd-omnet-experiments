@@ -43,7 +43,7 @@ void SimpleDroneProtocol::handlePacket(Packet *pk) {
         switch(message->getSenderType()) {
             case DRONE:
             {
-                std::cout << "Message recieved from drone, ignoring." << endl;
+                EV_DETAIL << "Message recieved from drone, ignoring." << endl;
                 break;
             }
             case SENSOR:

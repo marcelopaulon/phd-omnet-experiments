@@ -24,4 +24,5 @@ simple FailureGeneratorBase like IFailureGenerator
         @class(FailureGeneratorBase);
     gates:
         inout mobilityGate;
+        inout protocolGate;
 }

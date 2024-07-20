@@ -24,16 +24,29 @@ Define_Module(GroundStation);
 
 class MyVisitor : public cVisitor {
 public:
+    MyVisitor(std::vector<DroneMobility *> &instancesRef) : instances(instancesRef) {
+
+    }
+
     std::vector<double> x_coords;
     std::vector<double> y_coords;
     int numDrones = 0;
+    bool splitDrones = false;
+    std::vector<DroneMobility *> &instances;
+    std::string waypointFile;
 
     Coord groundStationPosition;
 
     void visit(cObject *obj) override {
         EV << "Object name: " << obj->getFullName() << endl;
 
-        if (strcmp(obj->getName(), "sensors") == 0) {
+        std::string name = obj->getName();
+
+        if (numDrones == 0 && !splitDrones) {
+            numDrones = 1;
+        }
+
+        if (name.find("sensors") != std::string::npos) {
             cModule *module = check_and_cast<cModule*>(obj);
             cObject *mobilityObj = module->findObject("mobility");
             StationaryMobility *mobility = check_and_cast<StationaryMobility*>(mobilityObj);
@@ -47,7 +60,18 @@ public:
             x_coords.push_back(x);
             y_coords.push_back(y);
         } else if (strcmp(obj->getName(), "quads") == 0) {
-            numDrones++;
+            if (splitDrones) {
+                numDrones++;
+            }
+
+            cModule *module = check_and_cast<cModule*>(obj);
+            cObject *mobilityObj = module->findObject("mobility");
+            DroneMobility *mobility = check_and_cast<DroneMobility*>(mobilityObj);
+
+            waypointFile = mobility->par("waypointFile").stdstringValue();
+
+            instances.push_back(mobility);
+
             EV << "Drone loaded" << endl;
         } else if (strcmp(obj->getName(), "groundStation") == 0) {
             cModule *module = check_and_cast<cModule*>(obj);
@@ -77,7 +101,7 @@ public:
             }
             outputFile << "DEMAND_SECTION" << std::endl;
             outputFile << "1 0" << std::endl; // Ground station has demand=0
-            int nUAVS = 2;
+            int nUAVS = 1;
             for (int i = 0; i < nSensors; i++) {
                 outputFile << (i + 2) << " " << nUAVS  << std::endl;
             }
@@ -87,7 +111,7 @@ public:
             outputFile << "EOF" << std::endl;
 
             outputFile.close(); // Close the file
-            std::cout << "Data written to the file successfully." << std::endl;
+            EV_DETAIL << "Data written to the file successfully." << std::endl;
         } else {
             std::cerr << "Error opening the file." << std::endl;
         }
@@ -106,12 +130,12 @@ void GroundStation::initialize(){
     scheduleAt(simTime(), postInitMsg); // Schedule the message at current simulation time
 
 
-    std::cout << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
+    EV_DETAIL << "UAV initialization of internalMobNodeId: " << internalMobNodeId << " Class " << this->getClassName() << "." << endl;
 }
 int GroundStation::processMessage(inet::Packet *msg) {
 
     // O getname � o payload
-    std::cout  << "GROUND-STATION-" << internalMobNodeId << " received: " << msg->getName() << endl;
+    EV_DETAIL  << "GROUND-STATION-" << internalMobNodeId << " received: " << msg->getName() << endl;
 
     return 1;
 
@@ -128,10 +152,14 @@ string GroundStation::generateNextPacketToSend(){
 
 void GroundStation::handleMessage(cMessage *msg) {
 
-    std::cout  << " GroundStation::handleMessage: " << msg << endl;
+    EV_DETAIL  << " GroundStation::handleMessage: " << msg << endl;
     if (msg->isSelfMessage()) {
         if (strcmp(msg->getName(), "PostInitializationMessage") == 0) {
             doPostInitializationTasks();
+            for (DroneMobility * mob : droneMobilityInstances) {
+                // Reinitialize mobility so it reads from the new paths file
+                mob->initialize(5000);
+            }
         }
         delete msg;
     }
@@ -143,7 +171,7 @@ void GroundStation::doPostInitializationTasks() {
 
         cModule *topModule = getModuleByPath("<root>");  // Get the top-level module
 
-        MyVisitor visitor;
+        MyVisitor visitor(droneMobilityInstances);
         topModule->forEachChild(&visitor);
 
         cObject *mobilityObj = this->findObject("mobility");
@@ -151,7 +179,7 @@ void GroundStation::doPostInitializationTasks() {
 
         auto coordinateSystem = getModuleFromPar<IGeographicCoordinateSystem>(mobility->par("coordinateSystemModule"), mobility, false);
 
-        std::string tempFileName = "instanceTemp.vrp";
+        std::string tempFileName = visitor.waypointFile + "-instanceTemp.vrp";
         visitor.saveTempFile(tempFileName);
 
         InstanceCVRPLIB cvrp(tempFileName, true);
@@ -177,7 +205,20 @@ void GroundStation::doPostInitializationTasks() {
             routes.clear();
             for (int k = 0; k < (int)indiv.chromR.size(); k++)
             {
-                std::string outputFileName = "paths/tempAutoRouteUav" + std::to_string(k) + ".waypoints";
+                std::string outputFileName = visitor.waypointFile;
+
+                // Find the position of "0" in visitor.waypointFile
+                size_t pos = outputFileName.find("0");
+
+                // Check if "0" was found in the string
+                if (pos != std::string::npos) {
+                    // Replace "0" with the integer k
+                    outputFileName.replace(pos, 1, std::to_string(k));
+                } else {
+                    EV_ERROR << "Missing 0 char in waypointFile. The char 0 must be present to be replaced by each route generated.";
+                    exit(-1337);
+                }
+
                 std::ofstream outputFile(outputFileName); // Open the file for writing
 
                 if (!indiv.chromR[k].empty())
@@ -204,10 +245,11 @@ void GroundStation::doPostInitializationTasks() {
                             nextQGC++;
                         }
 
-                        //outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
+                        // DADCA reverse:
+                        outputFile << nextQGC << "\t0\t3\t120\t0\t0\t0\t0\t0\t0\t0\t1" << std::endl; // Return to home
 
                         outputFile.close(); // Close the file
-                        std::cout << "Data written to the file successfully." << std::endl;
+                        EV_DETAIL << "Data written to the file successfully." << std::endl;
                     } else {
                         std::cerr << "Error opening the file." << std::endl;
                     }
@@ -220,7 +262,7 @@ void GroundStation::doPostInitializationTasks() {
                         double gsy = coordinateSystem->computeGeographicCoordinate(visitor.groundStationPosition).longitude.get();
                         outputFile << "0\t0\t0\t16\t0\t0\t0\t0\t" << gsx  << "\t" << gsy << "\t0\t1" << std::endl;
                         outputFile.close(); // Close the file
-                        std::cout << "Data written to the file successfully." << std::endl;
+                        EV_DETAIL << "Data written to the file successfully." << std::endl;
                     } else {
                         std::cerr << "Error opening the file." << std::endl;
                     }
@@ -230,8 +272,8 @@ void GroundStation::doPostInitializationTasks() {
             routeCost = indiv.eval.penalizedCost;
         }
     }
-    catch (const string& e) { std::cout << "EXCEPTION | " << e << std::endl; }
-    catch (const std::exception& e) { std::cout << "EXCEPTION | " << e.what() << std::endl; }
+    catch (const string& e) { EV_ERROR << "EXCEPTION | " << e << std::endl; }
+    catch (const std::exception& e) { EV_ERROR << "EXCEPTION | " << e.what() << std::endl; }
 }
 
 } //namespace

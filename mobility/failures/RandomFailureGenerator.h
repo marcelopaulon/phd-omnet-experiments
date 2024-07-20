@@ -34,6 +34,9 @@ class RandomFailureGenerator : public cSimpleModule
     double failureRollTime;
     double failureChance;
     double failureDuration;
+    bool movementFailures;
+    bool communicationFailures;
+    bool storageFailures;
 
     cMessage *timerMessage;
 };

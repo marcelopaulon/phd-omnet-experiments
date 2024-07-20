@@ -36,7 +36,7 @@ void DadcaAckGroundStationProtocol::initialize(int stage)
     if(stage == INITSTAGE_LOCAL) {
         timeoutDuration = par("timeoutDuration");
 
-        int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
+        //int duration = timeoutDuration.inUnit(SimTimeUnit::SIMTIME_S);
         // Signal that carries current data load and is emitted every time it is updated
         dataLoadSignalID = registerSignal("dataLoad");
         emit(dataLoadSignalID, currentDataLoad);
@@ -50,6 +50,11 @@ void DadcaAckGroundStationProtocol::initialize(int stage)
         WATCH(lastTarget);
         WATCH(currentDataLoad);
     }
+}
+
+void DadcaAckGroundStationProtocol::finish() {
+    ackRefresh();
+    CommunicationProtocolBase::finish();
 }
 
 void DadcaAckGroundStationProtocol::handleTelemetry(projeto::Telemetry *telemetry) {
@@ -96,7 +101,7 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
         bool destinationIsGroundstation = payload->getNextWaypointID() == -1;
 
         switch(payload->getMessageType()) {
-            case DadcaAckMessageType::HEARTBEAT:
+            case DadcaAckMessageType::UAV_PING_HEARTBEAT:
             {
                 // No communication from other drones matters while the drone is executing
                 // or if the drone is recharging/shutdown
@@ -126,54 +131,21 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                         initiateTimeout(timeoutDuration);
                         communicationStatus = REQUESTING;
 
-                        std::cout << this->getParentModule()->getId() << " recieved heartbeat from " << tentativeTarget << endl;
+                        EV_DETAIL << this->getParentModule()->getId() << " received UAV_PING_HEARTBEAT from " << tentativeTarget << endl;
                     }
                 }
                 break;
             }
-            case DadcaAckMessageType::PAIR_REQUEST:
+            case DadcaAckMessageType::PAIR_CONFIRM: // equivalent to UAV_MESSAGES ?
             {
                 // No communication form other drones matters while the drone is executing
                 if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
                     break;
                 }
-
-                if(payload->getDestinationID() != this->getParentModule()->getId()) {
-                    break;
-                }
-
-                // If the drone is collecting data, prefer to pair with other drone
-                if(communicationStatus == COLLECTING) {
-                    resetParameters();
-                }
-
-                if(isTimedout()) {
-                    if(payload->getSourceID() == tentativeTarget) {
-                        std::cout << payload->getDestinationID() << " recieved a pair request while timed out from " << payload->getSourceID() << endl;
-                        communicationStatus = PAIRED;
-                    }
-                } else {
-                    std::cout << payload->getDestinationID() << " recieved a pair request while not timed out from  " << payload->getSourceID() << endl;
-                    tentativeTarget = payload->getSourceID();
-                    tentativeTargetName = pk->getName();
-                    initiateTimeout(timeoutDuration);
-
-                    communicationStatus = PAIRED;
-                }
-
-                break;
-            }
-            case DadcaAckMessageType::PAIR_CONFIRM:
-            {
-                // No communication form other drones matters while the drone is executing
-                if(currentTelemetry.getCurrentCommand() != -1 && !destinationIsGroundstation) {
-                    break;
-                }
-
 
                 if(payload->getSourceID() == tentativeTarget &&
                    payload->getDestinationID() == this->getParentModule()->getId()) {
-                    std::cout << payload->getDestinationID() << " recieved a pair confirmation from  " << payload->getSourceID() << endl;
+                    EV_DETAIL << payload->getDestinationID() << " received a pair confirmation from  " << payload->getSourceID() << endl;
                     if(communicationStatus != PAIRED_FINISHED) {
                         // If both drones are travelling in the same direction, the pairing is canceled
                         // Doesn't apply if one drone is the groundStation
@@ -181,54 +153,41 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
                             // Exchanging imaginary data to the drone closest to the start of the mission
                             if(lastStableTelemetry.getLastWaypointID() < payload->getLastWaypointID()) {
                                 // Drone closest to the start gets the data
-                                currentDataLoad = currentDataLoad + payload->getDataLength();
+                                //currentDataLoad = currentDataLoad + payload->getDataLength();
 
-
-                                // Doesn't update neighbours if the drone has no waypoints
-                                // This prevents counting the groundStation as a drone
-                                if(!destinationIsGroundstation) {
-                                    // Drone closest to the start updates right neighbours
-                                    rightNeighbours = payload->getRightNeighbours() + 1;
-                                }
-                            } else {
-                                // Drone farthest away loses data
-                                currentDataLoad = 0;
-
-                                // Doesn't update neighbours if the drone has no waypoints
-                                // This prevents counting the groundStation as a drone
-                                if(!destinationIsGroundstation) {
-                                    // Drone farthest away updates left neighbours
-                                    leftNeighbours = payload->getLeftNeighbours() + 1;
-                                }
+                                updateAcks(payload->getMessageRanges());
                             }
 
-                            // Only completes redevouz if tour has been recieved or the paired drone has no waypoints
-                            // This prevents rendevouz with the groundStation
-                            if(tour.size() > 0 && !destinationIsGroundstation) {
-                                rendevouz();
-                            }
                             // Updating data load
-                            emit(dataLoadSignalID, currentDataLoad);
+                            ackRefresh();
                             communicationStatus = PAIRED_FINISHED;
 
                         }
                     }
                }
-                break;
+               break;
             }
-            case DadcaAckMessageType::BEARER:
+            case DadcaAckMessageType::BEARER: // equivalent to UAV_MESSAGES ?
             {
                 if(!isTimedout() && communicationStatus == FREE) {
-                    std::cout << this->getParentModule()->getId() << " recieved bearer request from  " << pk->getName() << endl;
-                    currentDataLoad = currentDataLoad + payload->getDataLength();
-                    stableDataLoad = currentDataLoad;
-                    emit(dataLoadSignalID, currentDataLoad);
+                    EV_DETAIL << this->getParentModule()->getId() << " received bearer request from  " << pk->getName() << endl;
+                    //currentDataLoad = currentDataLoad + payload->getDataLength();
+
+                    updateAcks(payload->getMessageRanges());
                     initiateTimeout(timeoutDuration);
 
                     communicationStatus = COLLECTING;
                 }
                 break;
             }
+            case DadcaAckMessageType::UAV_MESSAGES:
+            {
+
+                break;
+            }
+            default:
+                EV_DETAIL << std::endl << "[DadcaAckGroundStation] Ignoring received message " << payload->getMessageType() << std::endl;
+                break;
         }
         updatePayload();
     }
@@ -237,113 +196,45 @@ void DadcaAckGroundStationProtocol::handlePacket(Packet *pk) {
     if(mamPayload != nullptr) {
         if(!isTimedout() && communicationStatus == FREE) {
             currentDataLoad++;
-            stableDataLoad = currentDataLoad;
             emit(dataLoadSignalID, currentDataLoad);
         }
     }
 }
 
-void DadcaAckGroundStationProtocol::rendevouz() {
-    // Drone is the left or right one in the pair
-    bool isLeft = !lastStableTelemetry.isReversed();
-
-    // Calculates rally point
-    std::vector<double> cumulativeDistances;
-    double totalDistance = 0;
-    Coord lastCoord;
-    for(int i = 0; i < tour.size(); i++) {
-        Coord coord = tour[i];
-
-        if(i > 0) {
-            totalDistance += lastCoord.distance(coord);
-        }
-        cumulativeDistances.push_back(totalDistance);
-
-        lastCoord = coord;
-    }
-    int totalNeighbours = leftNeighbours + rightNeighbours;
-
-    // Shared border where the paired drones will meet
-    double sharedBorder = (double) leftNeighbours / (totalNeighbours + 1);
-    // If the drone is not inverted it will start it's trip from the end
-    // of it's segment and them invert
-    if(isLeft) {
-        sharedBorder += 1.0/(totalNeighbours + 1);
-    }
-    double sharedBorderDistance = totalDistance * sharedBorder;
-
-    // Determines the waypoint index closest to the shared border
-    int waypointIndex;
-    for(waypointIndex=0; waypointIndex < cumulativeDistances.size() ; waypointIndex++) {
-        if(cumulativeDistances[waypointIndex] > sharedBorderDistance) {
-            // Waypoint before the acumulated distance is higher than the
-            // shared border distance
-            waypointIndex--;
-            break;
-        }
+void DadcaAckGroundStationProtocol::updateAcks(const char *incomingMessageRanges) {
+    if (strcmp(incomingMessageRanges, "") == 0) {
+        return;
     }
 
-    // Fraction that devides the waypoint before the shared border and the one after it
-    // at the shared border
-    double localBorderFraction = 1 - (cumulativeDistances[waypointIndex + 1] - sharedBorderDistance) / (cumulativeDistances[waypointIndex + 1] - cumulativeDistances[waypointIndex]);
+    nlohmann::json jsonMap = nlohmann::json::parse(incomingMessageRanges);
+    std::unordered_map<std::string, std::pair<long,long>> receivedMessageRanges = jsonMap.get<std::unordered_map<std::string, std::pair<long,long>>>();
 
-    Coord coordsBefore = tour[waypointIndex];
-    Coord coordsAfter = tour[waypointIndex + 1];
-    Coord sharedBorderCoords = ((coordsAfter - coordsBefore) * localBorderFraction) + coordsBefore;
+    // BEGIN UPDATE ACKS
+    for (const auto& pair : receivedMessageRanges) {
+        const std::string& key = pair.first;
+        const std::pair<long, long>& range = pair.second;
+        long lastReceivedMessageSeq = range.second;
 
-    bool isAhead = false;
-
-    if(!isLeft) {
-        if(lastStableTelemetry.getNextWaypointID() > waypointIndex) {
-            isAhead = true;
-        }
-    } else {
-        if(lastStableTelemetry.getLastWaypointID() > waypointIndex) {
-            isAhead = true;
-        }
-    }
-
-    // The rendevouz is divided in three steps
-
-    // First the drones navigate to the waypoint closest to the shared border
-    // If the drones are already coming from/going to the waypoint closest they don't need this command
-    if((!isLeft || lastStableTelemetry.getLastWaypointID() != waypointIndex) &&
-            (isLeft || lastStableTelemetry.getNextWaypointID() != waypointIndex)) {
-        MobilityCommand *firstCommand = new MobilityCommand();
-        firstCommand->setCommandType(GOTO_WAYPOINT);
-
-        // If the drone is ahead of the shared border navigate to the next waypoint after it
-        if(isAhead) {
-            firstCommand->setParam1(waypointIndex + 1);
+        auto iter = acks.find(key);
+        if (iter != acks.end()) {
+            iter->second = lastReceivedMessageSeq;
         } else {
-            firstCommand->setParam1(waypointIndex);
+            acks[key] = lastReceivedMessageSeq;
         }
-
-        sendCommand(firstCommand);
     }
+    // END UPDATE ACKS
 
-    // Them the drones meet at the shared border
-    MobilityCommand *secondCommand = new MobilityCommand();
-    secondCommand->setCommandType(GOTO_COORDS);
-    secondCommand->setParam1(sharedBorderCoords.x);
-    secondCommand->setParam2(sharedBorderCoords.y);
-    secondCommand->setParam3(sharedBorderCoords.z);
+    ackRefresh();
+}
 
-    // After the drones reach the coords they will be oriented
-    // going from waypointIndex to waypointIndex + 1
-    secondCommand->setParam4(waypointIndex + 1);
-    secondCommand->setParam5(waypointIndex);
-    sendCommand(secondCommand);
-
-
-    // Them the drones reverses
-    // Only the drone on the left needs to reverse
-    // since both drones are oriented unreversed
-    if(isLeft) {
-        MobilityCommand *thirdCommand = new MobilityCommand();
-        thirdCommand->setCommandType(REVERSE);
-        sendCommand(thirdCommand);
+void DadcaAckGroundStationProtocol::ackRefresh() {
+    // Set data load according to acked data
+    int tempDataLoad = 0;
+    for (const auto& pair : acks) {
+        tempDataLoad += pair.second;
     }
+    currentDataLoad = tempDataLoad;
+    emit(dataLoadSignalID, currentDataLoad);
 }
 
 void DadcaAckGroundStationProtocol::updatePayload() {
@@ -367,15 +258,15 @@ void DadcaAckGroundStationProtocol::updatePayload() {
     switch(communicationStatus) {
         case FREE:
         {
-            payload->setMessageType(DadcaAckMessageType::HEARTBEAT);
-            std::cout << payload->getSourceID() << " set to heartbeat" << endl;
+            payload->setMessageType(DadcaAckMessageType::UAV_PING_HEARTBEAT);
+            EV_DETAIL << payload->getSourceID() << " set to UAV_PING_HEARTBEAT" << endl;
             break;
         }
         case REQUESTING:
         {
-            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST);
+            payload->setMessageType(DadcaAckMessageType::PAIR_REQUEST_BASE_PING);
             payload->setDestinationID(tentativeTarget);
-            std::cout << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair request to " << payload->getDestinationID() << endl;
             break;
         }
         case PAIRED:
@@ -383,9 +274,9 @@ void DadcaAckGroundStationProtocol::updatePayload() {
         {
             payload->setMessageType(DadcaAckMessageType::PAIR_CONFIRM);
             payload->setDestinationID(tentativeTarget);
-            payload->setDataLength(stableDataLoad);
+            payload->setDataLength(currentDataLoad);
 
-            std::cout << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
+            EV_DETAIL << payload->getSourceID() << " set to pair confirmation to " << payload->getDestinationID() << endl;
             break;
         }
         case COLLECTING:
@@ -400,6 +291,11 @@ void DadcaAckGroundStationProtocol::updatePayload() {
             payload->getLastWaypointID() != lastPayload.getLastWaypointID() ||
             payload->getReversed() != lastPayload.getReversed()) {
         lastPayload = *payload;
+
+        nlohmann::json jsonMap = acks;
+
+        // Set acks
+        payload->setAcks(jsonMap.dump().c_str());
 
         CommunicationCommand *command = new CommunicationCommand();
         command->setCommandType(SET_PAYLOAD);
@@ -440,7 +336,6 @@ void DadcaAckGroundStationProtocol::resetParameters() {
     communicationStatus = FREE;
 
     lastStableTelemetry = currentTelemetry;
-    stableDataLoad = currentDataLoad;
 
     updatePayload();
 }

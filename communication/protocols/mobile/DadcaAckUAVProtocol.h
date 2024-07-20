@@ -16,7 +16,9 @@
 #ifndef __PROJETO_DadcaAckUAVProtocol_H_
 #define __PROJETO_DadcaAckUAVProtocol_H_
 
+#include <unordered_map>
 #include <omnetpp.h>
+#include "../json.hpp"
 #include "../base/CommunicationProtocolBase.h"
 #include "../../messages/network/DadcaAckMessage_m.h"
 #include "inet/common/geometry/common/Coord.h"
@@ -28,7 +30,7 @@ namespace projeto {
 enum CommunicationStatus { FREE=0, REQUESTING=1, PAIRED=2, COLLECTING=3, PAIRED_FINISHED=4 };
 
 /*
- * DadcaAckUAVProtocol implements a protocol that receives and sends DadcaMessages to simulate a
+ * DadcaProtocol implements a protocol that recieves and sends DadcaAckMessages to simulate a
  * drone collecting data from sensors and sharing it with other drones. This protocol implements
  * the DADCA protocol.
  */
@@ -36,6 +38,7 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 {
     protected:
         simtime_t timeoutDuration;
+        int maxBufferSize;
 
         // DADCA variables
         // Current tour recieved from telemetry
@@ -57,8 +60,9 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 
         // Current imaginary data being carried
         int currentDataLoad=0;
-        // Stable data load to prevent data loss during pairing
-        int stableDataLoad=currentDataLoad;
+
+        // Current imaginary buffer load
+        int currentBufferLoad=0;
 
         // Last telemetry package recieved
         Telemetry currentTelemetry = Telemetry();
@@ -66,6 +70,16 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
 
         DadcaAckMessage lastPayload = DadcaAckMessage();
 
+
+        std::unordered_map<std::string, long> acks; //Map<SensorId, LastAcked> acks;
+        std::unordered_map<std::string, long> messages; //Map<SensorId, Messages> messages;
+        std::unordered_map<std::string, std::pair<long, long>> messageRanges; //Map<SensorId, Range> messageRanges;
+
+        double baseStationX = -1;
+        double baseStationY = -1;
+
+        bool failedComms = false;
+        bool failedStorage = false;
     protected:
         virtual void initialize(int stage) override;
 
@@ -73,11 +87,16 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         virtual void handleTelemetry(projeto::Telemetry *telemetry) override;
         // Reacts to message recieved and updates payload accordingly
         virtual void handlePacket(Packet *pk) override;
+        virtual void handleMessage(cMessage *msg) override;
         // Checks if timeout has finished and resets parameters if it has
         virtual bool isTimedout() override;
         // Resets parameters
         virtual void resetParameters();
+        void record1sStatistics();
     private:
+        virtual void updateAcks(const char *incomingAcks);
+        virtual void updateRanges(const char *incomingRanges);
+
         // Sends sequence of orders that defines a rendevouz point, navigates
         // to it and reverses
         virtual void rendevouz();
@@ -85,8 +104,13 @@ class DadcaAckUAVProtocol : public CommunicationProtocolBase
         // Updates payload that communication will send
         virtual void updatePayload();
         virtual void setTarget(const char *target);
+
+        cMessage *record1sStatisticsEvent;
+        cOutVector baseDistanceVector;
+        cOutVector bufferSizeVector;
     public:
         simsignal_t dataLoadSignalID;
+        simsignal_t bufferLoadSignalID;
 };
 
 } //namespace

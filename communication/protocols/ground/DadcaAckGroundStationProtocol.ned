@@ -22,5 +22,7 @@ simple DadcaAckGroundStationProtocol extends CommunicationProtocolBase
     parameters:
         @class(DadcaAckGroundStationProtocol);
         @signal[dataLoad](type=long); // Declaration of dataLoad signal used to track current data load that the drone is carrying
+        @statistic[dataReceived](title="dadca data received by base"; source="dataLoad"; record=max; interpolationmode=none);
+        
         double timeoutDuration @unit(s) = default(3s);
 }
